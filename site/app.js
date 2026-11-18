@@ -18,7 +18,8 @@ const app = window.RadarApp;  // ponte com o app Android (não existe no navegad
 const le = (k, pad) => { try { const v = localStorage.getItem("radar2." + k); return v === null ? pad : JSON.parse(v); } catch (e) { return pad; } };
 const guarda = (k, v) => { try { localStorage.setItem("radar2." + k, JSON.stringify(v)); } catch (e) {} };
 const BLOCOS = [["principais", "Principais notícias"], ["locais", "Notícias locais"], ["voce", "Para você"], ["videos", "Vídeos em alta"], ["espectro", "Pelo espectro"], ["recentes", "Mais recentes"]];
-const cfg = Object.assign({tema: "sistema", fs: 16, auto: true, autoMin: 15, cidade: "Araçuaí", blocos: {}}, le("cfg", {}));
+// leitor: no app Android, as notícias abrem no leitor do Radar (só o texto); no navegador, no site (a maioria bloqueia a leitura)
+const cfg = Object.assign({tema: "sistema", fs: 16, auto: true, autoMin: 15, cidade: "Araçuaí", blocos: {}, leitor: window.RadarApp?.baixar ? "app" : "site"}, le("cfg", {}));
 const cliques = le("cliques", {}), cliquesTema = le("cliquesTema", {});
 let seguindo = new Set(le("seguindo", []));
 let ocultos = new Set(le("ocultos", []));
@@ -1213,6 +1214,10 @@ function vAlertas(parte) {
     + `<label class="op" ${cfg.auto ? "" : "hidden"} id="autoMin"><span class="t"><b>A cada</b></span><select name="autoMin">${op(5, "5 min", cfg.autoMin)}${op(15, "15 min", cfg.autoMin)}${op(30, "30 min", cfg.autoMin)}${op(60, "1 hora", cfg.autoMin)}</select></label>`
     + `<label class="op"><span class="t"><b>Cidade do clima</b></span><select name="cidade">${cs.filter(l => l.lat != null).map(l => op(l.nome, l.nome, cfg.cidade)).join("")}</select></label>`
     + `</section>`
+    + `<section class="grupo"><h2>Leitura</h2>`
+    + `<label class="op"><span class="t"><b>Abrir notícias</b><span>${app?.baixar ? "No leitor, a notícia abre aqui só com o texto, com fundo, letra e PDF à sua escolha." : "No navegador do PC, a maioria dos sites não deixa o leitor buscar o texto; no app do celular funciona."}</span></span><select name="leitor">${op("app", "No leitor do Radar", cfg.leitor)}${op("site", "No site do jornal", cfg.leitor)}</select></label>`
+    + `</section>`
+    + (app?.erros ? `<section class="grupo" id="erros-app"><h2>Erros do app</h2><p>Se o app fechar sozinho, o motivo fica anotado aqui. Copie e mande para quem cuida do Radar.</p><div class="erros-corpo"></div></section>` : "")
     + `<section class="grupo"><details class="sobre"><summary>Como a relevância é medida</summary>`
     + `<p>Não dá para saber quantas pessoas leram cada notícia nos outros sites. Então o Radar mede assim:</p><ul>`
     + `<li><b>Principais do dia:</b> os assuntos que mais veículos cobriram nas últimas 24 h, não só nas últimas horas. Uma notícia de 18 h atrás vale metade de uma de agora.</li>`
@@ -1225,6 +1230,7 @@ function vAlertas(parte) {
     + `</form>`;
   const form = $("#aj");
   ligarFiltroFontes(form);
+  mostrarErros();
   form.onchange = e => {
     if (e.target.matches(".filtra-f, #nova-cidade")) return;
     const fd = new FormData(form);
@@ -1232,7 +1238,7 @@ function vAlertas(parte) {
       silencio: fd.has("silencio"), de: +fd.get("de"), ate: +fd.get("ate"), nivel: fd.get("nivel"), modo: fd.get("modo"),
       escolhidos: fd.getAll("escolhido"), temas: fd.getAll("tema").length === Object.keys(D.temas).length ? null : fd.getAll("tema")});
     const ligados = new Set(fd.getAll("bloco"));
-    Object.assign(cfg, {tema: fd.get("tema_cor"), fs: +fd.get("fs"), auto: fd.has("auto"), autoMin: +fd.get("autoMin"), cidade: fd.get("cidade") || cfg.cidade,
+    Object.assign(cfg, {leitor: fd.get("leitor") || cfg.leitor, tema: fd.get("tema_cor"), fs: +fd.get("fs"), auto: fd.has("auto"), autoMin: +fd.get("autoMin"), cidade: fd.get("cidade") || cfg.cidade,
       blocos: Object.fromEntries(BLOCOS.map(([k]) => [k, ligados.has(k)]))});
     $("#horas").hidden = !alertas.silencio; $("#autoMin").hidden = !cfg.auto;
     form.querySelector("details summary").textContent = `Marcar jornais (${alertas.escolhidos.length})`;
@@ -1265,9 +1271,31 @@ async function adicionarCidade() {
   } catch (e) { est.textContent = "Sem conexão para procurar a cidade."; }
 }
 
+// erros guardados pelo app Android (o celular não mostra o log)
+function mostrarErros() {
+  const el = $("#erros-app .erros-corpo");
+  if (!el) return;
+  let txt = "";
+  try { txt = app.erros() || ""; } catch (e) {}
+  if (!txt) { el.innerHTML = `<p class="rodape">Nenhum erro anotado.</p>`; return; }
+  el.innerHTML = `<pre class="erros"></pre><div class="acoes-erros"><button type="button" class="btn" id="copiar-erros">Copiar</button><button type="button" class="btn" id="limpar-erros">Apagar</button></div>`;
+  el.querySelector("pre").textContent = txt;
+  $("#copiar-erros").onclick = async e => {
+    try { await navigator.clipboard.writeText(txt); e.target.textContent = "Copiado"; }
+    catch (x) { const r = document.createRange(); r.selectNodeContents(el.querySelector("pre")); getSelection().removeAllRanges(); getSelection().addRange(r); e.target.textContent = "Selecionado: copie"; }
+  };
+  $("#limpar-erros").onclick = () => { app.limparErros(); mostrarErros(); };
+}
+
 // ---------- eventos globais ----------
 document.addEventListener("click", e => {
   const a = e.target.closest("a[data-f]");
+  // ler no app: abre no leitor (o link continua indo ao site com o dedo segurando / Ctrl+clique)
+  if (a && cfg.leitor === "app" && window.radarLeitor && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.button === 0) {
+    e.preventDefault();
+    const i = D.itens.find(x => x.u === a.href) || {};
+    radarLeitor.abrir(a.href, {titulo: i.t || a.textContent, fonte: i.f?.nome || "", ts: i.ts, im: i.im, resumo: i.r});
+  }
   if (a) {  // aprende o que você lê (só neste aparelho)
     cliques[a.dataset.f] = (cliques[a.dataset.f] || 0) + 1; guarda("cliques", cliques);
     for (const t of (a.dataset.tm || "").split(" ").filter(Boolean)) cliquesTema[t] = (cliquesTema[t] || 0) + 1;
@@ -1300,6 +1328,18 @@ function abrirHash(hash) {
   if (location.hash === "#" + hash) render(); else location.hash = "#" + hash;
 }
 window.radarAbrir = abrirHash;
+// botão voltar do Android: primeiro fecha o leitor ou a folha aberta; true = a página cuidou
+window.radarVoltar = () => {
+  if (window.radarLeitor?.aberto()) { radarLeitor.fechar(); return true; }
+  const f = $("#folha"); if (f?.open) { f.close(); return true; }
+  return false;
+};
+// erros de JavaScript vão para o registro do app (Ajustes > Erros do app); no máximo 3 por abertura
+let errosEnviados = 0;
+window.addEventListener("error", e => {
+  if (!app?.erroPagina || errosEnviados++ >= 3 || !e.message) return;
+  try { app.erroPagina(`${e.message} (${(e.filename || "").split("/").pop()}:${e.lineno})\n${e.error?.stack || ""}`); } catch (x) {}
+});
 if (location.hash === "#manchetes") { secao = "manchetes"; guarda("secao", secao); history.replaceState(null, "", "#inicio"); }
 
 let relogio, saiu = 0;

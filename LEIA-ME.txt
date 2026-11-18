@@ -36,6 +36,18 @@ ABAS
   filtros de cidade, período, assunto, eleições e "cidade no título". Nas cidades do Vale, o bloco
   Notícias locais do Início também usa esses dados.
 
+LER NO APP (leitor)
+- Tocar numa notícia abre o leitor: só o texto (Readability, o do modo leitura do Firefox), sem anúncios nem menus.
+  Botão Aa: fundo (claro, sépia, escuro, preto), letra, fonte, espaçamento e largura (ficam guardados).
+  PDF: abre a impressão do Android; escolha "Salvar como PDF". Também: compartilhar e abrir no site do jornal.
+- Ajustes > Leitura > Abrir notícias: no leitor ou no site. No navegador do PC a maioria dos sites bloqueia
+  (o padrão lá é abrir no site). Sites com assinatura mostram só o resumo e o botão para o site.
+- O texto de terceiros passa pelo DOMPurify antes de entrar na página (a página tem a ponte com o app).
+
+ERROS DO APP
+- Se o app fechar sozinho, o motivo fica em Alertas e ajustes > Erros do app (Copiar / Apagar).
+- O app agora recria a página quando o sistema a fecha por falta de memória (comum no Xiaomi), em vez de fechar.
+
 NO CELULAR (APK)
 - Widgets: "Radar: principais notícias" (1x1 = ícone; baixo = 1 manchete; maior = lista) e "Radar: busca".
 - Segurar o ícone: Buscar, Manchetes, Vídeos e suas 2 primeiras coleções.

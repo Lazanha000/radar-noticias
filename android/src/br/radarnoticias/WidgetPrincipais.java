@@ -37,7 +37,12 @@ public class WidgetPrincipais extends AppWidgetProvider {
     }
 
     static void redesenhar(Context c) {
+        try { redesenhar0(c); } catch (Throwable e) { Radar.registrar(c, "redesenhar widget", e); }
+    }
+
+    static void redesenhar0(Context c) {
         AppWidgetManager m = AppWidgetManager.getInstance(c);
+        if (m == null) return;
         int[] ids = m.getAppWidgetIds(new ComponentName(c, WidgetPrincipais.class));
         for (int id : ids) m.updateAppWidget(id, montar(c, id, m.getAppWidgetOptions(id)));
         m.notifyAppWidgetViewDataChanged(ids, R.id.lista);
@@ -98,15 +103,18 @@ public class WidgetPrincipais extends AppWidgetProvider {
 
     @Override
     public void onUpdate(Context c, AppWidgetManager m, int[] ids) {
-        for (int id : ids) m.updateAppWidget(id, montar(c, id, m.getAppWidgetOptions(id)));
+        try { for (int id : ids) m.updateAppWidget(id, montar(c, id, m.getAppWidgetOptions(id))); }
+        catch (Throwable e) { Radar.registrar(c, "widget", e); }
         final PendingResult r = goAsync();
         final Context app = c.getApplicationContext();
-        new Thread(new Runnable() { public void run() { baixarEAtualizar(app); r.finish(); } }).start();
+        new Thread(new Runnable() { public void run() {
+                try { baixarEAtualizar(app); } catch (Throwable e) { Radar.registrar(app, "widget", e); } finally { r.finish(); }
+            } }).start();
     }
 
     @Override
     public void onAppWidgetOptionsChanged(Context c, AppWidgetManager m, int id, Bundle op) {
-        m.updateAppWidget(id, montar(c, id, op));
+        try { m.updateAppWidget(id, montar(c, id, op)); } catch (Throwable e) { Radar.registrar(c, "widget", e); }
     }
 
     @Override
@@ -114,7 +122,9 @@ public class WidgetPrincipais extends AppWidgetProvider {
         if (ATUALIZAR.equals(i.getAction())) {
             final PendingResult r = goAsync();
             final Context app = c.getApplicationContext();
-            new Thread(new Runnable() { public void run() { baixarEAtualizar(app); r.finish(); } }).start();
+            new Thread(new Runnable() { public void run() {
+                try { baixarEAtualizar(app); } catch (Throwable e) { Radar.registrar(app, "widget", e); } finally { r.finish(); }
+            } }).start();
             return;
         }
         super.onReceive(c, i);

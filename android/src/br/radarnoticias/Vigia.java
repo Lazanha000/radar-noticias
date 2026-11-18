@@ -54,8 +54,10 @@ public class Vigia extends JobService {
         final JobParameters params = p;
         new Thread(new Runnable() { public void run() {
             try { verificar(Vigia.this); } catch (Exception e) { /* sem internet: tenta na próxima */ }
-            WidgetPrincipais.baixarEAtualizar(Vigia.this);  // aproveita para atualizar os widgets
-            jobFinished(params, false);
+            catch (Throwable e) { Radar.registrar(Vigia.this, "alertas em segundo plano", e); }
+            try { WidgetPrincipais.baixarEAtualizar(Vigia.this); }  // aproveita para atualizar os widgets
+            catch (Throwable e) { Radar.registrar(Vigia.this, "widget em segundo plano", e); }
+            try { jobFinished(params, false); } catch (Throwable e) { }
         } }).start();
         return true;
     }
@@ -63,15 +65,50 @@ public class Vigia extends JobService {
     @Override
     public boolean onStopJob(JobParameters p) { return true; }
 
+    static final String UA = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36";
+
+    /** Baixa um texto (feed, JSON ou página para o leitor): segue redirecionamentos (também http -> https),
+     *  usa a codificação que o site declara (cabeçalho ou <meta charset>) e para em 8 MB. */
     static String baixarTexto(String url) throws Exception {
-        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
-        c.setConnectTimeout(20000); c.setReadTimeout(30000);
-        try (InputStream in = c.getInputStream()) {
-            ByteArrayOutputStream o = new ByteArrayOutputStream();
-            byte[] b = new byte[16384];
-            for (int n; (n = in.read(b)) > 0; ) o.write(b, 0, n);
-            return o.toString("UTF-8");
+        for (int pulo = 0; pulo < 6; pulo++) {
+            HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+            c.setConnectTimeout(20000); c.setReadTimeout(30000);
+            c.setInstanceFollowRedirects(false);
+            c.setRequestProperty("User-Agent", UA);
+            c.setRequestProperty("Accept-Language", "pt-BR,pt;q=0.9,en;q=0.6");
+            int st = c.getResponseCode();
+            if (st >= 300 && st < 400 && c.getHeaderField("Location") != null) {
+                url = new URL(new URL(url), c.getHeaderField("Location")).toString();
+                c.disconnect();
+                continue;
+            }
+            if (st >= 400) { c.disconnect(); throw new Exception("HTTP " + st); }
+            byte[] bytes;
+            try (InputStream in = c.getInputStream()) {
+                ByteArrayOutputStream o = new ByteArrayOutputStream();
+                byte[] b = new byte[16384];
+                for (int n; (n = in.read(b)) > 0; ) {
+                    o.write(b, 0, n);
+                    if (o.size() > 8 << 20) throw new Exception("página grande demais");
+                }
+                bytes = o.toByteArray();
+            }
+            return decodificar(bytes, c.getContentType());
         }
+        throw new Exception("redirecionamentos demais");
+    }
+
+    static String decodificar(byte[] bytes, String tipo) {
+        String cs = null;
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("charset=[\"']?([\\w-]+)", java.util.regex.Pattern.CASE_INSENSITIVE)
+            .matcher(tipo == null ? "" : tipo);
+        if (m.find()) cs = m.group(1);
+        if (cs == null) {  // <meta charset="..."> nos primeiros 2 KB
+            m = java.util.regex.Pattern.compile("charset=[\"']?([\\w-]+)", java.util.regex.Pattern.CASE_INSENSITIVE)
+                .matcher(new String(bytes, 0, Math.min(bytes.length, 2048), java.nio.charset.StandardCharsets.ISO_8859_1));
+            if (m.find()) cs = m.group(1);
+        }
+        try { return new String(bytes, cs == null ? "UTF-8" : cs); } catch (Exception e) { return new String(bytes, java.nio.charset.StandardCharsets.UTF_8); }
     }
 
     static Set<String> lista(JSONArray a) {

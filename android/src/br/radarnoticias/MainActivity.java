@@ -26,6 +26,18 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle salvo) {
         super.onCreate(salvo);
         getWindow().setStatusBarColor(0xFF081211);
+        String hash = hashDe(getIntent());
+        criarWeb(SITE + (hash != null ? "#" + hash : ""));
+        try { Vigia.agendar(this); } catch (Throwable e) { Radar.registrar(this, "agendar alertas", e); }  // reagenda depois de atualizar o app
+        new Thread(new Runnable() { public void run() {
+            try { verificarAtualizacao(); } catch (Throwable e) { Radar.registrar(getApplicationContext(), "verificar atualização", e); }
+            try { WidgetPrincipais.baixarEAtualizar(getApplicationContext()); } catch (Throwable e) { Radar.registrar(getApplicationContext(), "widget", e); }
+        } }).start();
+    }
+
+    /** Cria o WebView. Também é chamado quando o sistema mata o processo da página para liberar memória
+     *  (Xiaomi faz muito isso): sem tratar, o Android fecha o app inteiro com "o app parou". */
+    void criarWeb(String url) {
         web = new WebView(this);
         web.getSettings().setJavaScriptEnabled(true);
         web.getSettings().setDomStorageEnabled(true);  // ajustes, coleções e o que você segue
@@ -38,15 +50,23 @@ public class MainActivity extends Activity {
                 abrir(u);
                 return true;
             }
+
+            @Override
+            public boolean onRenderProcessGone(WebView v, android.webkit.RenderProcessGoneDetail d) {
+                Radar.registrar(MainActivity.this, "a página foi fechada pelo sistema (" + (d.didCrash() ? "travou" : "falta de memória")
+                    + "); recarreguei", new Exception("WebView render process gone"));
+                String onde = SITE;
+                try { String u = v.getUrl(); if (u != null && u.startsWith(SITE)) onde = u; } catch (Throwable e) { }
+                if (v == web) {
+                    ((android.view.ViewGroup) v.getParent()).removeView(v);
+                    v.destroy();
+                    criarWeb(onde);
+                } else v.destroy();
+                return true;  // tratado: o app continua aberto
+            }
         });
         setContentView(web);
-        String hash = hashDe(getIntent());
-        if (salvo == null) web.loadUrl(SITE + (hash != null ? "#" + hash : "")); else web.restoreState(salvo);
-        Vigia.agendar(this);  // reagenda depois de atualizar o app
-        if (salvo == null) new Thread(new Runnable() { public void run() {
-            verificarAtualizacao();
-            WidgetPrincipais.baixarEAtualizar(getApplicationContext());
-        } }).start();
+        web.loadUrl(url);
     }
 
     /** Atalhos do ícone e widgets abrem "radar:busca", "radar:colecao/ID"... */
@@ -59,6 +79,11 @@ public class MainActivity extends Activity {
         try { startActivity(new Intent(Intent.ACTION_VIEW, u)); } catch (Exception e) { /* nenhum app abre esse link */ }
     }
 
+    /** startActivity que não derruba o app (algumas telas do sistema não existem em todo Android, ex.: Xiaomi). */
+    void abrirTela(Intent i) {
+        try { startActivity(i); } catch (Throwable e) { Radar.registrar(this, "abrir tela " + i.getAction(), e); }
+    }
+
     // ---------- atualização automática ----------
     @SuppressWarnings("deprecation")
     void verificarAtualizacao() {
@@ -69,7 +94,7 @@ public class MainActivity extends Activity {
             if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
                 runOnUiThread(new Runnable() { public void run() {
                     Toast.makeText(MainActivity.this, "Há uma versão nova do Radar. Permita instalar apps desta fonte para atualizar.", Toast.LENGTH_LONG).show();
-                    startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName())));
+                    abrirTela(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName())));
                 } });
                 return;
             }
@@ -95,12 +120,12 @@ public class MainActivity extends Activity {
     protected void onNewIntent(Intent i) {
         super.onNewIntent(i);
         String hash = hashDe(i);
-        if (hash != null) { web.evaluateJavascript("window.radarAbrir && radarAbrir(" + JSONObject.quote(hash) + ")", null); return; }
+        if (hash != null && web != null) { web.evaluateJavascript("window.radarAbrir && radarAbrir(" + JSONObject.quote(hash) + ")", null); return; }
         if (!INSTALOU.equals(i.getAction())) return;
         int st = i.getIntExtra(PackageInstaller.EXTRA_STATUS, -999);
         if (st == PackageInstaller.STATUS_PENDING_USER_ACTION) {
             Intent confirmar = i.getParcelableExtra(Intent.EXTRA_INTENT);  // tela do Android "Atualizar este app?"
-            if (confirmar != null) startActivity(confirmar.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            if (confirmar != null) abrirTela(confirmar.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
         } else if (st != PackageInstaller.STATUS_SUCCESS) {
             Toast.makeText(this, "Não deu para atualizar agora; tento de novo depois.", Toast.LENGTH_LONG).show();
         }
@@ -121,7 +146,7 @@ public class MainActivity extends Activity {
             if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission("android.permission.POST_NOTIFICATIONS") != PackageManager.PERMISSION_GRANTED)
                 runOnUiThread(new Runnable() { public void run() { requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 1); } });
             else if (!getSystemService(android.app.NotificationManager.class).areNotificationsEnabled())
-                runOnUiThread(new Runnable() { public void run() { startActivity(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName())); } });
+                runOnUiThread(new Runnable() { public void run() { abrirTela(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName())); } });
         }
         @JavascriptInterface public void testar() {
             Vigia.notificar(MainActivity.this, "Radar Notícias · teste", "Assim chega um aviso de notícia relevante. Toque para abrir.", SITE, 1);
@@ -135,7 +160,7 @@ public class MainActivity extends Activity {
                     txt = Vigia.baixarTexto(url); ok = true;
                 } catch (Exception e) { txt = String.valueOf(e.getMessage()); }
                 final String js = "window.radarResposta && radarResposta(" + id + "," + ok + "," + JSONObject.quote(txt) + ")";
-                runOnUiThread(new Runnable() { public void run() { web.evaluateJavascript(js, null); } });
+                runOnUiThread(new Runnable() { public void run() { if (web != null) web.evaluateJavascript(js, null); } });
             } }).start();
         }
         /** Suas coleções viram atalhos ao segurar o ícone do app (junto de Buscar, Manchetes e Vídeos). */
@@ -155,19 +180,53 @@ public class MainActivity extends Activity {
                 getSystemService(android.content.pm.ShortcutManager.class).setDynamicShortcuts(l);
             } catch (Exception e) { /* atalho é extra: sem ele o app segue normal */ }
         }
+        /** Erros guardados pelo app (o celular não mostra o log): Alertas e ajustes > Último erro do app. */
+        @JavascriptInterface public String erros() {
+            return getSharedPreferences("radar", MODE_PRIVATE).getString("erros", "");
+        }
+        @JavascriptInterface public void limparErros() {
+            getSharedPreferences("radar", MODE_PRIVATE).edit().remove("erros").apply();
+        }
+        /** Erro de JavaScript da página, para ficar no mesmo registro. */
+        @JavascriptInterface public void erroPagina(String txt) {
+            Radar.registrar(MainActivity.this, "erro na página", new Exception(String.valueOf(txt)));
+        }
+        /** Leitor: "Salvar em PDF" abre a impressão do Android (escolher "Salvar como PDF"). A página esconde tudo
+         *  menos o texto na impressão (CSS @media print). */
+        @JavascriptInterface public void imprimir(final String titulo) {
+            runOnUiThread(new Runnable() { public void run() {
+                try {
+                    android.print.PrintManager pm = (android.print.PrintManager) getSystemService(PRINT_SERVICE);
+                    String nome = (titulo == null || titulo.trim().isEmpty() ? "Radar" : titulo.trim()).replaceAll("[\\\\/:*?\"<>|]", " ");
+                    if (nome.length() > 80) nome = nome.substring(0, 80);
+                    pm.print(nome, web.createPrintDocumentAdapter(nome), new android.print.PrintAttributes.Builder()
+                        .setMediaSize(android.print.PrintAttributes.MediaSize.ISO_A4).build());
+                } catch (Throwable e) {
+                    Radar.registrar(MainActivity.this, "imprimir", e);
+                    Toast.makeText(MainActivity.this, "Não deu para abrir a impressão.", Toast.LENGTH_LONG).show();
+                }
+            } });
+        }
+        /** Leitor: compartilhar o link (ou o texto) com outro app. */
+        @JavascriptInterface public void compartilhar(final String titulo, final String url) {
+            runOnUiThread(new Runnable() { public void run() {
+                abrirTela(Intent.createChooser(new Intent(Intent.ACTION_SEND).setType("text/plain")
+                    .putExtra(Intent.EXTRA_SUBJECT, titulo).putExtra(Intent.EXTRA_TEXT, titulo + "\n" + url), "Compartilhar"));
+            } });
+        }
         @JavascriptInterface public String versao() {
             try { return getPackageManager().getPackageInfo(getPackageName(), 0).versionName; } catch (Exception e) { return ""; }
         }
     }
 
     @Override
-    protected void onSaveInstanceState(Bundle b) {
-        super.onSaveInstanceState(b);
-        web.saveState(b);
-    }
-
-    @Override
     public void onBackPressed() {
-        if (web.canGoBack()) web.goBack(); else super.onBackPressed();
+        if (web != null) web.evaluateJavascript("window.radarVoltar ? radarVoltar() : false", new android.webkit.ValueCallback<String>() {
+            public void onReceiveValue(String fechou) {
+                if ("true".equals(fechou)) return;  // a página fechou o leitor ou um painel
+                if (web.canGoBack()) web.goBack(); else MainActivity.super.onBackPressed();
+            }
+        });
+        else super.onBackPressed();
     }
 }
