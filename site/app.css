@@ -333,3 +333,19 @@ details.sobre p,details.sobre li{color:var(--tx2);font-size:.88rem}
 .etq.incerta{background:none;border:1px dashed var(--tx3);font-style:italic}
 .chips.quebra{flex-wrap:wrap;overflow:visible}
 .ranking{margin-top:12px}
+
+/* vídeos: cartão com estrela, vistos, buscas acompanhadas */
+.video{position:relative}
+.vlink{display:grid;gap:4px;text-decoration:none}
+.vlink:hover .vt{text-decoration:underline}
+.video.visto .capa img{opacity:.55}
+.selo.visto{left:6px;right:auto;background:var(--ac);color:var(--ac-tx)}
+.video .vm{justify-content:flex-start}
+.video .vm .lnk{border:0;background:none;padding:6px 0;color:inherit;font:inherit;cursor:pointer;text-align:left;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.video .vm .lnk:hover{text-decoration:underline}
+.video .vfav{width:36px;height:36px;margin:-6px -6px -6px 0}
+.video .vfav svg.i{width:20px;height:20px}
+.video .vt .nova{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ac);vertical-align:middle}
+.conta{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:var(--ac);color:var(--ac-tx);font-size:.7rem;margin-left:4px}
+.campo-busca .btn-i{flex-shrink:0}
+#vacoes{padding-top:0}

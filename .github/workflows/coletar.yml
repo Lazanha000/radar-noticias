@@ -32,7 +32,7 @@ jobs:
       # o histórico fica só no site publicado (não no repositório, para ele não inchar)
       - name: Baixar o que já foi publicado
         run: |
-          for f in recentes antigas; do curl -sfL "https://lazanha000.github.io/radar-noticias/$f.json" -o "site/$f.json" || rm -f "site/$f.json"; done
+          for f in recentes antigas videos; do curl -sfL "https://lazanha000.github.io/radar-noticias/$f.json" -o "site/$f.json" || rm -f "site/$f.json"; done
       - run: python coletor.py
       - uses: actions/upload-pages-artifact@v5
         with:

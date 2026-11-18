@@ -602,60 +602,292 @@ async function vRegiao() {
   repinta();
 }
 
-// ---------- vídeos ----------
+// ---------- vídeos (no espírito do Garimpo YouTube, mas sem servidor: feeds públicos dos canais) ----------
+const TOPICOS = [["imprensa", "Imprensa"], ["noticias", "Notícias e atualidades"], ["historia", "História"], ["geral", "Canais em geral"]];
+let listasV = le("listasV", []);              // {id, nome, canais: [ids]}
+let favV = le("favV", []);                    // {id, t, ts, c, cid}: vídeos salvos
+let vistosV = new Set(le("vistosV", []));
+let buscasV = le("buscasV", []);              // {q, em}: buscas acompanhadas
+let canaisMeus = le("canaisMeus", []);        // canais que você adicionou: {id, nome, cid, tp:["meus"]}
+const cacheMeus = le("canaisMeusCache", {});  // id -> {em, itens:[[t,vid,ts,v,s]]}
+const visitaVideos = le("visitaVideos", 0);
+const fV = Object.assign({aba: "novidades", q: "", ordem: "data", minV: 0, tem: "", sem: "", periodo: 0, shorts: true, alas: [], esconderVistos: false, canal: ""}, le("fV", {}));
+
+function lerVideos(d) {
+  D.canais = d.canais.map(c => ({...c, tp: c.tp || ["imprensa"]}));
+  const vs = d.itens.map(([t, id, ts, ci, v, s]) => ({t, id, ts, c: D.canais[ci], v, s}));
+  for (const m of canaisMeus) {
+    const c = {id: m.id, nome: m.nome, ala: "", tp: ["meus"], cid: m.cid, meu: true};
+    D.canais.push(c);
+    for (const [t, id, ts, v, s] of cacheMeus[m.id]?.itens || []) vs.push({t, id, ts, c, v, s});
+  }
+  const vistos = new Set();
+  D.videos = vs.filter(x => /^[\w-]{11}$/.test(x.id) && !vistos.has(x.id) && vistos.add(x.id))
+    .map(x => ({...x, k: norm(x.t + " " + x.c.nome)})).sort((a, b) => b.ts - a.ts);
+}
 async function carregarVideos() {
   if (D.videos) return D.videos;
-  const d = await baixar("videos.json");
-  D.videos = d.itens.map(([t, id, ts, ci, v, s]) => ({t, id, ts, c: d.canais[ci], v, s, k: norm(t + " " + d.canais[ci].nome)}))
-    .filter(x => /^[\w-]{11}$/.test(x.id));
-  D.canais = d.canais;
+  D.videosBruto = await baixar("videos.json");
+  lerVideos(D.videosBruto);
+  atualizarCanaisMeus();
   return D.videos;
 }
+// canais adicionados por você: lidos pelo aparelho (no app Android, pela ponte; o navegador bloqueia o YouTube)
+function lerFeedYT(xml) {
+  const doc = new DOMParser().parseFromString(xml, "text/xml");
+  return [...doc.getElementsByTagName("entry")].map(e => {
+    const g = n => e.getElementsByTagName(n)[0];
+    const st = g("media:statistics");
+    return [g("title")?.textContent || "", g("yt:videoId")?.textContent || "", Date.parse(g("published")?.textContent) / 1000,
+      +(st?.getAttribute("views") || 0), +/\/shorts\//.test(g("link")?.getAttribute("href") || "")];
+  }).filter(x => x[1] && x[2]);
+}
+async function atualizarCanaisMeus(forcar) {
+  const velhos = canaisMeus.filter(m => forcar || !cacheMeus[m.id] || Date.now() - cacheMeus[m.id].em > 30 * 60 * 1000);
+  if (!velhos.length) return;
+  let mudou = false;
+  await Promise.all(velhos.map(async m => {
+    try {
+      const novos = lerFeedYT(await baixarTexto("https://www.youtube.com/feeds/videos.xml?channel_id=" + m.cid));
+      const antes = (cacheMeus[m.id]?.itens || []).filter(x => !novos.some(n => n[1] === x[1]));
+      cacheMeus[m.id] = {em: Date.now(), itens: [...novos, ...antes].slice(0, 40)}; mudou = true;
+    } catch (e) {}
+  }));
+  if (!mudou) return;
+  guarda("canaisMeusCache", cacheMeus);
+  lerVideos(D.videosBruto);
+  if (location.hash.startsWith("#videos")) vVideos();
+}
+async function adicionarCanal(texto) {
+  texto = texto.trim();
+  let cid = (texto.match(/UC[\w-]{22}/) || [])[0];
+  let nome = "";
+  if (!cid) {
+    const h = (texto.match(/@[^\s/?]+/) || [])[0] || (/^[\w.-]+$/.test(texto) ? "@" + texto : "");
+    if (!h) throw new Error("Cole o link do canal, o @nome ou o ID (UC…).");
+    const pag = await baixarTexto("https://www.youtube.com/" + encodeURI(h));
+    cid = (pag.match(/"externalId":"(UC[\w-]{22})"/) || pag.match(/channel\/(UC[\w-]{22})/) || [])[1];
+    if (!cid) throw new Error("Não achei esse canal.");
+  }
+  const xml = await baixarTexto("https://www.youtube.com/feeds/videos.xml?channel_id=" + cid);
+  const itens = lerFeedYT(xml);
+  nome = new DOMParser().parseFromString(xml, "text/xml").getElementsByTagName("title")[0]?.textContent || cid;
+  if (D.canais.some(c => c.cid === cid)) throw new Error("Esse canal já está no Radar.");
+  const m = {id: "m-" + cid.slice(2, 12).toLowerCase(), nome, cid};
+  canaisMeus.push(m); guarda("canaisMeus", canaisMeus);
+  cacheMeus[m.id] = {em: Date.now(), itens: itens.slice(0, 40)}; guarda("canaisMeusCache", cacheMeus);
+  lerVideos(D.videosBruto);
+  return m;
+}
+
 const notaVideo = x => (x.v + 50) / Math.pow((agora() - x.ts) / H + 2, 1.4);
 const visualiz = v => v >= 1e6 ? (v / 1e6).toFixed(1).replace(".", ",").replace(",0", "") + " mi" : v >= 1e3 ? Math.round(v / 1e3) + " mil" : String(v);
+const icoCanal = c => c.meu ? `<span class="ico-f">${inicial(c.nome)}</span>` : `<img src="ico/${esc(c.id)}.jpg" alt="" loading="lazy" onerror="this.remove()">`;
+const ehFav = id => favV.some(f => f.id === id);
 function cartaoVideo(x) {
-  return `<a class="video" href="https://www.youtube.com/watch?v=${x.id}" target="_blank" rel="noopener">`
-    + `<span class="capa"><img src="https://i.ytimg.com/vi/${x.id}/mqdefault.jpg" alt="" loading="lazy">${x.s ? '<span class="selo">Short</span>' : ""}</span>`
-    + `<span class="vt">${esc(x.t)}</span>`
-    + `<span class="vm"><img src="ico/${esc(x.c.id)}.jpg" alt="" loading="lazy" onerror="this.remove()"><span class="ala r-${x.c.ala}"></span>${esc(x.c.nome)}</span>`
-    + `<span class="vm2">${quando(x.ts)}${x.v ? ` · ${visualiz(x.v)} visualizações` : ""}</span></a>`;
+  const novo = visitaVideos && x.ts > visitaVideos && !vistosV.has(x.id);
+  return `<div class="video${vistosV.has(x.id) ? " visto" : ""}"><a class="vlink" href="https://www.youtube.com/watch?v=${x.id}" target="_blank" rel="noopener" data-vid="${x.id}">`
+    + `<span class="capa"><img src="https://i.ytimg.com/vi/${x.id}/mqdefault.jpg" alt="" loading="lazy">${x.s ? '<span class="selo">Short</span>' : ""}${vistosV.has(x.id) ? '<span class="selo visto">Visto</span>' : ""}</span>`
+    + `<span class="vt">${novo ? '<span class="nova" title="Novo desde sua última visita"></span> ' : ""}${esc(x.t)}</span></a>`
+    + `<span class="vm">${icoCanal(x.c)}${x.c.ala ? `<span class="ala r-${x.c.ala}"></span>` : ""}<button class="lnk" data-canal="${esc(x.c.id)}">${esc(x.c.nome)}</button>`
+    + `<button class="btn-i estrela vfav" data-fav="${x.id}" aria-pressed="${ehFav(x.id)}" aria-label="Favoritar">${ic("estrela")}</button></span>`
+    + `<span class="vm2">${quando(x.ts)}${x.v ? ` · ${visualiz(x.v)} visualizações` : ""}</span></div>`;
 }
 async function videosEmAlta() {
   const el = $("#b-videos");
   try { await carregarVideos(); } catch (e) { el?.remove(); return; }
   if (!el || !document.body.contains(el)) return;
-  const top = D.videos.filter(x => !x.s && x.ts >= agora() - 48 * H).sort((a, b) => notaVideo(b) - notaVideo(a));
+  const top = D.videos.filter(x => !x.s && x.ts >= agora() - 48 * H && x.c.tp.some(t => t === "imprensa" || t === "noticias")).sort((a, b) => notaVideo(b) - notaVideo(a));
   const um = [], canais = new Set();
   for (const x of top) { if (!canais.has(x.c.id)) { um.push(x); canais.add(x.c.id); } if (um.length === 8) break; }  // um por canal
   el.querySelector(".vazio").outerHTML = `<div class="faixa-videos">${um.map(cartaoVideo).join("")}</div>`;
 }
-let filtroVideos = {alas: new Set(), ordem: "rel", shorts: le("shorts", true), canal: "", q: ""};
-async function vVideos() {
-  $("#vista").innerHTML = cabecalho("Vídeos", "Canais de notícias no YouTube") + `<div class="vazio">Carregando…</div>`;
-  try { await carregarVideos(); } catch (e) { $("#vista .vazio").textContent = "Sem conexão."; return; }
-  const f = filtroVideos;
-  const pinta = () => {
-    const q = termos(f.q);
-    let vs = D.videos.filter(x => (!f.alas.size || f.alas.has(x.c.ala)) && (f.shorts || !x.s) && (!f.canal || x.c.id === f.canal) && q.every(t => x.k.includes(t)));
-    if (f.ordem === "rel") vs = vs.sort((a, b) => notaVideo(b) - notaVideo(a));
-    $("#vlista").innerHTML = vs.length ? vs.slice(0, 120).map(cartaoVideo).join("") : `<div class="vazio">Nenhum vídeo com esses filtros.</div>`;
-    $("#vcont").textContent = `${vs.length} vídeos`;
-  };
-  $("#vista").innerHTML = cabecalho("Vídeos", `${D.canais.filter(c => c.n).length} canais de notícias no YouTube`)
-    + `<label class="campo-busca">${ic("busca")}<input type="search" id="vq" placeholder="Buscar vídeos" aria-label="Buscar vídeos" value="${esc(f.q)}"></label>`
-    + `<div class="chips" id="valas"><button data-a="" aria-pressed="${!f.alas.size}">Todas</button>${ALAS.map(([a, n]) => `<button data-a="${a}" aria-pressed="${f.alas.has(a)}"><span class="ala r-${a}" style="display:inline-block;margin-right:6px"></span>${n}</button>`).join("")}</div>`
-    + `<div class="ferr"><div class="seg" role="group" aria-label="Ordenar"><button data-o="rel" aria-pressed="${f.ordem === "rel"}">Em alta</button><button data-o="data" aria-pressed="${f.ordem === "data"}">Mais recentes</button></div>`
-    + `<select id="vcanal" class="sel" aria-label="Canal"><option value="">Todos os canais</option>${ALAS.map(([a, n]) => `<optgroup label="${n}">${D.canais.filter(c => c.ala === a && c.n).map(c => `<option value="${esc(c.id)}" ${f.canal === c.id ? "selected" : ""}>${esc(c.nome)}</option>`).join("")}</optgroup>`).join("")}</select>`
-    + `<label class="mini"><input type="checkbox" id="vshorts" class="chave" ${f.shorts ? "checked" : ""}>Shorts</label><span class="cont" id="vcont"></span></div>`
-    + `<div class="grade-videos" id="vlista"></div>`;
-  $("#valas").onclick = e => { const b = e.target.closest("button"); if (!b) return; const a = b.dataset.a; if (!a) f.alas.clear(); else f.alas.has(a) ? f.alas.delete(a) : f.alas.add(a); vVideos(); };
-  $(".ferr").onclick = e => { const b = e.target.closest("[data-o]"); if (b) { f.ordem = b.dataset.o; vVideos(); } };
-  $("#vcanal").onchange = e => { f.canal = e.target.value; pinta(); };
-  $("#vshorts").onchange = e => { f.shorts = e.target.checked; guarda("shorts", f.shorts); pinta(); };
-  let espera;
-  $("#vq").oninput = e => { clearTimeout(espera); espera = setTimeout(() => { f.q = e.target.value; pinta(); }, 140); };
-  pinta();
+
+// de quais canais é cada aba
+function canaisDaAba(aba) {
+  if (aba === "tp:todos") return null;
+  if (aba === "novidades") {
+    const meus = new Set([...listasV.flatMap(l => l.canais), ...canaisMeus.map(m => m.id)]);
+    return meus.size ? meus : new Set(D.canais.filter(c => c.tp.includes("noticias") || c.tp.includes("geral")).map(c => c.id));
+  }
+  if (aba.startsWith("tp:")) { const t = aba.slice(3); return new Set(D.canais.filter(c => c.tp.includes(t)).map(c => c.id)); }
+  if (aba.startsWith("lista:")) return new Set((listasV.find(l => l.id === aba.slice(6)) || {canais: []}).canais);
+  if (aba === "meus") return new Set(canaisMeus.map(m => m.id));
+  return null;
 }
+function filtrarVideos(f, aba = f.aba) {
+  if (aba === "favoritos") {
+    const porId = new Map(D.videos.map(x => [x.id, x]));
+    return favV.map(s => porId.get(s.id) || {t: s.t, id: s.id, ts: s.ts, v: 0, s: 0, c: D.canais.find(c => c.id === s.c) || {id: s.c, nome: s.cn || "", ala: "", tp: [], meu: true}, k: norm(s.t)});
+  }
+  const cs = canaisDaAba(aba), q = termos(f.q), tem = termos(f.tem), sem = termos(f.sem), lim = f.periodo ? agora() - f.periodo * 86400 : 0;
+  let vs = D.videos.filter(x => (!cs || cs.has(x.c.id)) && x.ts >= lim && (f.shorts || !x.s) && (!f.canal || x.c.id === f.canal)
+    && (!f.alas.length || f.alas.includes(x.c.ala)) && x.v >= f.minV && (!f.esconderVistos || !vistosV.has(x.id))
+    && q.every(t => x.k.includes(t)) && tem.every(t => norm(x.t).includes(t)) && !sem.some(t => norm(x.t).includes(t)));
+  const ord = {rel: (a, b) => notaVideo(b) - notaVideo(a), data: (a, b) => b.ts - a.ts, antigo: (a, b) => a.ts - b.ts, vistos: (a, b) => b.v - a.v,
+    canal: (a, b) => a.c.nome.localeCompare(b.c.nome) || b.ts - a.ts, titulo: (a, b) => a.t.localeCompare(b.t)}[f.ordem];
+  return vs.sort(ord);
+}
+
+async function vVideos() {
+  $("#vista").innerHTML = cabecalho("Vídeos") + `<div class="vazio">Carregando…</div>`;
+  try { await carregarVideos(); } catch (e) { $("#vista .vazio").textContent = "Sem conexão."; return; }
+  const f = fV;
+  if (f.aba.startsWith("lista:") && !listasV.some(l => "lista:" + l.id === f.aba)) f.aba = "novidades";
+  const abas = [["novidades", "Novidades"], ...TOPICOS.map(([t, n]) => ["tp:" + t, n]), ...listasV.map(l => ["lista:" + l.id, l.nome]),
+    ...(canaisMeus.length ? [["meus", "Meus canais"]] : []), ["favoritos", `Favoritos${favV.length ? " · " + favV.length : ""}`]];
+  const ativos = [f.periodo && ({1: "24 h", 7: "7 dias", 30: "30 dias", 365: "1 ano"}[f.periodo]), f.minV && `${visualiz(f.minV)}+ visualizações`,
+    f.tem && `com "${f.tem}"`, f.sem && `sem "${f.sem}"`, !f.shorts && "sem Shorts", f.esconderVistos && "sem vistos",
+    ...f.alas.map(a => NOME_ALA[a]), f.canal && (D.canais.find(c => c.id === f.canal) || {}).nome].filter(Boolean);
+  $("#vista").innerHTML = cabecalho("Vídeos", `${D.canais.filter(c => c.n || c.meu).length} canais no YouTube`, `<button class="btn" id="vlistas">${ic("colecoes")}Listas e canais</button>`)
+    + `<nav class="trilho" aria-label="Seções de vídeos">${abas.map(([k, n]) => `<button data-aba="${esc(k)}" aria-pressed="${f.aba === k}">${esc(n)}</button>`).join("")}</nav>`
+    + `<label class="campo-busca">${ic("busca")}<input type="search" id="vq" placeholder="Buscar nos seus canais" aria-label="Buscar nos canais" value="${esc(f.q)}" enterkeyhint="search">`
+    + `<button class="btn-i" id="vsalvarq" aria-label="Acompanhar esta busca" title="Acompanhar esta busca">${ic("sino")}</button></label>`
+    + (buscasV.length ? `<div class="chips" id="vbuscas">${buscasV.map((b, k) => { const n = filtrarVideos({...f, q: b.q, periodo: 0, canal: ""}, "tp:todos").filter(x => x.ts > b.em).length; return `<button data-bq="${k}">${esc(b.q)}${n ? ` <b class="conta">${n}</b>` : ""}</button>`; }).join("")}</div>` : "")
+    + `<div class="ferr"><select id="vordem" class="sel" aria-label="Ordenar">${[["data", "Mais recentes"], ["rel", "Em alta"], ["vistos", "Mais vistos"], ["antigo", "Mais antigos"], ["canal", "Por canal"], ["titulo", "Por título"]].map(([v, n]) => `<option value="${v}" ${f.ordem === v ? "selected" : ""}>${n}</option>`).join("")}</select>`
+    + `<button class="btn ${ativos.length ? "sel" : ""}" id="vfiltros">${ic("filtro")}Filtros${ativos.length ? ` (${ativos.length})` : ""}</button><span class="cont" id="vcont"></span></div>`
+    + (ativos.length ? `<div class="filtros-ativos"><span class="rodape" style="padding:0">${ativos.map(esc).join(" · ")}</span> <button id="vlimpa">Limpar ${ic("fechar")}</button></div>` : "")
+    + `<div class="ferr" id="vacoes"></div><div class="grade-videos" id="vlista"></div><div class="mais" id="vmais"></div>`;
+  $("#vista").querySelector(".trilho")?.querySelector("[aria-pressed=true]") && rolaAte($(".trilho [aria-pressed=true]"));
+  const vs = filtrarVideos(f);
+  $("#vcont").textContent = `${vs.length} vídeos`;
+  $("#vacoes").innerHTML = `<a class="btn" href="https://www.youtube.com/results?search_query=${encodeURIComponent(f.q || "")}" target="_blank" rel="noopener">${ic("externo")}Buscar no YouTube todo</a>`
+    + (vs.length ? `<button class="btn" id="vcopiar">Copiar links (${Math.min(vs.length, 200)})</button>` : "")
+    + (f.aba === "favoritos" && favV.length ? `<button class="btn" id="vlimpafav" style="color:var(--perigo)">Esvaziar favoritos</button>` : "");
+  let n = 0;
+  const poe = () => { const fatia = vs.slice(n, n + 40); n += fatia.length; $("#vlista").insertAdjacentHTML("beforeend", fatia.map(cartaoVideo).join("")); };
+  if (!vs.length) $("#vlista").innerHTML = `<div class="vazio">${f.aba === "favoritos" ? "Toque na estrela de um vídeo para guardá-lo aqui." : f.aba === "meus" ? "Nenhum vídeo ainda." : "Nenhum vídeo com esses filtros."}</div>`;
+  else { poe(); new IntersectionObserver((es, o) => { if (es[0].isIntersecting) { poe(); if (n >= vs.length) o.disconnect(); } }, {rootMargin: "900px"}).observe($("#vmais")); }
+  if (f.aba === "novidades" && !listasV.length && !canaisMeus.length) $("#vacoes").insertAdjacentHTML("afterend", `<p class="aviso">Novidades mostra os últimos vídeos dos canais das suas listas. Sem listas, mostra Notícias e atualidades e Canais em geral. Crie listas em "Listas e canais".</p>`);
+  guarda("fV", f);
+  if (f.aba === "novidades") guarda("visitaVideos", Math.floor(agora()));
+
+  $(".trilho").onclick = e => { const b = e.target.closest("[data-aba]"); if (!b) return; f.aba = b.dataset.aba; f.canal = ""; if (f.aba === "novidades" || f.aba.startsWith("lista:")) f.ordem = "data"; vVideos(); };
+  $("#vordem").onchange = e => { f.ordem = e.target.value; vVideos(); };
+  $("#vfiltros").onclick = () => filtrosVideos(f);
+  $("#vlimpa")?.addEventListener("click", () => { Object.assign(f, {periodo: 0, minV: 0, tem: "", sem: "", shorts: true, esconderVistos: false, alas: [], canal: ""}); vVideos(); });
+  $("#vlistas").onclick = () => editarListas();
+  let espera;
+  $("#vq").oninput = e => { clearTimeout(espera); espera = setTimeout(() => { f.q = e.target.value; vVideos(); setTimeout(() => { const i = $("#vq"); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }); }, 300); };
+  $("#vsalvarq").onclick = () => {
+    if (!f.q.trim()) { alert("Digite uma busca para acompanhar."); return; }
+    if (!buscasV.some(b => b.q === f.q.trim())) { buscasV.push({q: f.q.trim(), em: Math.floor(agora())}); guarda("buscasV", buscasV); }
+    vVideos();
+  };
+  $("#vbuscas")?.addEventListener("click", e => {
+    const b = e.target.closest("[data-bq]"); if (!b) return;
+    const k = +b.dataset.bq;
+    if (f.q === buscasV[k].q) { if (confirm(`Parar de acompanhar "${buscasV[k].q}"?`)) { buscasV.splice(k, 1); guarda("buscasV", buscasV); } }
+    else { f.q = buscasV[k].q; buscasV[k].em = Math.floor(agora()); guarda("buscasV", buscasV); f.aba = f.aba === "favoritos" ? "novidades" : f.aba; }
+    vVideos();
+  });
+  $("#vcopiar")?.addEventListener("click", async e => {
+    const txt = vs.slice(0, 200).map(x => `https://www.youtube.com/watch?v=${x.id}`).join("\n");
+    try { await navigator.clipboard.writeText(txt); e.target.textContent = "Copiado"; } catch (err) { prompt("Copie os links:", txt); }
+  });
+  $("#vlimpafav")?.addEventListener("click", () => { if (confirm("Tirar todos os vídeos dos favoritos?")) { favV = []; guarda("favV", favV); vVideos(); } });
+  $("#vlista").onclick = e => {
+    const c = e.target.closest("[data-canal]");
+    if (c) { f.canal = c.dataset.canal; f.aba = "tp:" + (D.canais.find(x => x.id === f.canal)?.tp[0] || "imprensa"); if (f.aba === "tp:meus") f.aba = "meus"; vVideos(); }
+  };
+}
+
+function filtrosVideos(f) {
+  const d = $("#folha");
+  const cs = canaisDaAba(f.aba);
+  const canais = D.canais.filter(c => (!cs || cs.has(c.id)) && (c.n || c.meu)).sort((a, b) => a.nome.localeCompare(b.nome));
+  d.innerHTML = `<form method="dialog"><div class="f-cab"><h2>Filtros de vídeos</h2><button class="btn-i" value="x" aria-label="Fechar" formnovalidate>${ic("fechar")}</button></div><div class="f-corpo">`
+    + `<h3>Período</h3><div class="opcoes">${[[0, "Tudo"], [1, "24 h"], [7, "7 dias"], [30, "30 dias"], [365, "1 ano"]].map(([v, n]) => `<label><input type="radio" name="periodo" value="${v}" ${f.periodo === v ? "checked" : ""}>${n}</label>`).join("")}</div>`
+    + `<h3>Canal</h3><select name="canal"><option value="">Todos desta aba</option>${canais.map(c => `<option value="${esc(c.id)}" ${f.canal === c.id ? "selected" : ""}>${esc(c.nome)}</option>`).join("")}</select>`
+    + `<h3>Mínimo de visualizações</h3><select name="minV">${[[0, "Qualquer"], [1000, "1 mil"], [10000, "10 mil"], [100000, "100 mil"], [1000000, "1 milhão"]].map(([v, n]) => `<option value="${v}" ${f.minV === v ? "selected" : ""}>${n}</option>`).join("")}</select>`
+    + `<h3>Precisa ter no título</h3><input type="text" name="tem" value="${esc(f.tem)}" placeholder="ex.: aula, análise">`
+    + `<h3>Esconder se tiver no título</h3><input type="text" name="sem" value="${esc(f.sem)}" placeholder="ex.: ao vivo, corte">`
+    + `<h3>Linha editorial (só imprensa)</h3><div class="opcoes">${ALAS.map(([a, n]) => `<label><input type="checkbox" name="ala" value="${a}" ${f.alas.includes(a) ? "checked" : ""}><span class="ala r-${a}"></span>${n}</label>`).join("")}</div>`
+    + `<h3>Mostrar</h3><div class="opcoes"><label><input type="checkbox" name="shorts" ${f.shorts ? "checked" : ""}>Shorts</label><label><input type="checkbox" name="vistos" ${f.esconderVistos ? "" : "checked"}>Vídeos já vistos</label></div>`
+    + `</div><div class="f-pe"><button class="btn" value="limpar" formnovalidate>Limpar</button><button class="btn pri" value="ok">Aplicar</button></div></form>`;
+  aoEscolher(d, (v, fd) => {
+    if (v === "limpar") Object.assign(f, {periodo: 0, minV: 0, tem: "", sem: "", shorts: true, esconderVistos: false, alas: [], canal: ""});
+    else if (v === "ok") {
+      Object.assign(f, {periodo: +fd.get("periodo"), canal: fd.get("canal"), minV: +fd.get("minV"), tem: fd.get("tem").trim(), sem: fd.get("sem").trim(),
+        alas: fd.getAll("ala"), shorts: fd.has("shorts"), esconderVistos: !fd.has("vistos")});
+    } else return;
+    vVideos();
+  });
+  d.returnValue = ""; d.showModal();
+}
+
+// responde ao botão escolhido no envio do formulário (não depende do evento "close", que alguns navegadores atrasam)
+function aoEscolher(d, fn) {
+  d.querySelector("form").onsubmit = e => { e.preventDefault(); const v = e.submitter?.value || "ok"; d.close(v); fn(v, new FormData(e.target)); };
+  d.onclose = null;
+}
+
+// listas de canais e canais próprios
+function editarListas(lista) {
+  const d = $("#folha");
+  if (!lista) {
+    d.innerHTML = `<form method="dialog"><div class="f-cab"><h2>Listas e canais</h2><button class="btn-i" value="x" aria-label="Fechar">${ic("fechar")}</button></div><div class="f-corpo">`
+      + `<h3>Suas listas</h3>${listasV.length ? `<ul class="lista-cidades">${listasV.map(l => `<li><span>${esc(l.nome)} <small>${l.canais.length} canais</small></span><button type="button" class="btn" data-ed="${esc(l.id)}">${ic("editar")}Editar</button></li>`).join("")}</ul>` : `<p class="rodape">Nenhuma ainda. As listas viram abas e alimentam Novidades.</p>`}`
+      + `<button type="button" class="btn pri" id="nova-lista">${ic("mais")}Nova lista</button>`
+      + `<h3>Adicionar canal do YouTube</h3><p class="rodape" style="padding:0">Cole o link do canal, o @nome ou o ID. ${app ? "" : "No navegador do PC o YouTube bloqueia; adicione pelo app do celular."}</p>`
+      + `<div class="add-cidade"><input type="text" id="novo-canal" placeholder="ex.: @canal ou youtube.com/@canal" autocomplete="off"><button type="button" class="btn" id="add-canal">${ic("mais")}Adicionar</button></div><p id="estado-canal" class="rodape" aria-live="polite"></p>`
+      + (canaisMeus.length ? `<h3>Canais que você adicionou</h3><ul class="lista-cidades">${canaisMeus.map(m => `<li><span>${esc(m.nome)}</span><button type="button" class="btn-i" data-tira-canal="${esc(m.id)}" aria-label="Tirar ${esc(m.nome)}">${ic("fechar")}</button></li>`).join("")}</ul>` : "")
+      + `</div></form>`;
+    d.querySelector("#nova-lista").onclick = () => editarListas({id: "l" + Date.now().toString(36), nome: "", canais: [], nova: true});
+    d.querySelectorAll("[data-ed]").forEach(b => b.onclick = () => editarListas(listasV.find(l => l.id === b.dataset.ed)));
+    d.querySelectorAll("[data-tira-canal]").forEach(b => b.onclick = () => {
+      canaisMeus = canaisMeus.filter(m => m.id !== b.dataset.tiraCanal); guarda("canaisMeus", canaisMeus);
+      lerVideos(D.videosBruto); editarListas();
+    });
+    d.querySelector("#add-canal").onclick = async () => {
+      const est = d.querySelector("#estado-canal"); est.textContent = "Procurando…";
+      try { const m = await adicionarCanal(d.querySelector("#novo-canal").value); est.textContent = `Adicionado: ${m.nome}.`; setTimeout(() => editarListas(), 900); }
+      catch (e) { est.textContent = e.message.startsWith("HTTP") || e.message === "Failed to fetch" ? "Não deu para ler o YouTube daqui." : e.message; }
+    };
+    aoEscolher(d, () => vVideos());
+    d.onclose = () => { if (!d.querySelector("[name=nome]")) vVideos(); };  // Esc ou fundo
+    if (!d.open) { d.returnValue = ""; d.showModal(); }
+    return;
+  }
+  const canais = D.canais.filter(c => c.n || c.meu);
+  const grupo = (titulo, cs) => cs.length ? `<h3>${esc(titulo)}</h3>` + cs.map(c => `<label data-nome="${esc(norm(c.nome))}"><input type="checkbox" name="canal" value="${esc(c.id)}" ${lista.canais.includes(c.id) ? "checked" : ""}>${icoCanal(c)}${esc(c.nome)}</label>`).join("") : "";
+  d.innerHTML = `<form method="dialog"><div class="f-cab"><h2>${lista.nova ? "Nova lista" : "Editar lista"}</h2><button class="btn-i" value="voltar" aria-label="Voltar" formnovalidate>${ic("voltar")}</button></div><div class="f-corpo">`
+    + `<h3>Nome</h3><input type="text" name="nome" required maxlength="30" value="${esc(lista.nome)}" placeholder="Ex.: Economia, Para ver no fim de semana">`
+    + `<h3>Canais</h3><input type="text" class="filtra-f" placeholder="Procurar canal" aria-label="Procurar canal">`
+    + `<div class="marcar">${grupo("Notícias e atualidades", canais.filter(c => c.tp.includes("noticias")))}${grupo("Canais em geral", canais.filter(c => c.tp.includes("geral") && !c.tp.includes("noticias")))}`
+    + `${grupo("História", canais.filter(c => c.tp.includes("historia") && !c.tp.includes("geral")))}${grupo("Meus canais", canais.filter(c => c.meu))}`
+    + ALAS.map(([a, n]) => grupo("Imprensa · " + n, canais.filter(c => c.tp.includes("imprensa") && c.ala === a))).join("") + `</div>`
+    + `</div><div class="f-pe">${lista.nova ? "" : `<button class="btn" value="apagar" style="margin-right:auto;color:var(--perigo)" formnovalidate>Apagar</button>`}<button class="btn pri" value="ok">Salvar</button></div></form>`;
+  d.querySelector(".filtra-f").oninput = e => { const q = norm(e.target.value); d.querySelectorAll(".marcar label").forEach(l => l.hidden = !l.dataset.nome.includes(q)); };
+  aoEscolher(d, (v, fd) => {
+    if (v === "apagar") { if (!confirm(`Apagar a lista "${lista.nome}"?`)) return; listasV = listasV.filter(l => l.id !== lista.id); }
+    else if (v === "ok") {
+      const nova = {id: lista.id, nome: fd.get("nome").trim() || "Lista", canais: fd.getAll("canal")};
+      listasV = lista.nova ? [...listasV, nova] : listasV.map(l => l.id === lista.id ? nova : l);
+      fV.aba = "lista:" + nova.id; fV.ordem = "data";
+    } else if (v !== "voltar") return;
+    guarda("listasV", listasV);
+    if (v === "voltar") { editarListas(); return; }
+    vVideos();
+  });
+  if (!d.open) { d.returnValue = ""; d.showModal(); }
+}
+
+// favoritar e marcar como visto valem em qualquer tela (início também tem vídeos)
+document.addEventListener("click", e => {
+  const fav = e.target.closest("[data-fav]");
+  if (fav) {
+    e.preventDefault();
+    const id = fav.dataset.fav, x = D.videos?.find(v => v.id === id);
+    if (ehFav(id)) favV = favV.filter(f => f.id !== id);
+    else if (x) favV.unshift({id, t: x.t, ts: x.ts, c: x.c.id, cn: x.c.nome});
+    guarda("favV", favV);
+    document.querySelectorAll(`[data-fav="${id}"]`).forEach(b => b.setAttribute("aria-pressed", ehFav(id)));
+    return;
+  }
+  const v = e.target.closest("[data-vid]");
+  if (v) { vistosV.add(v.dataset.vid); guarda("vistosV", [...vistosV].slice(-3000)); v.closest(".video")?.classList.add("visto"); }
+});
 
 // feed genérico: ordem, filtros e lista
 function feed(el, f, {semFontes} = {}) {

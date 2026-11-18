@@ -17,7 +17,14 @@ ABAS
 - Alertas e ajustes: notificações (de quais jornais, quando, temas, silêncio, limite por dia),
   tema, letra, atualização automática e cidade do clima.
 
-- Vídeos: 38 canais de notícias do YouTube (canais.json), nas 4 linhas; "Em alta" = visualizações por hora.
+- Vídeos: 99 canais em canais.json, com tópicos (tp): imprensa (com linha editorial), noticias
+  (Notícias e atualidades), historia e geral. Abas: Novidades (últimos vídeos das suas listas), os 4 tópicos,
+  suas listas, Meus canais e Favoritos. Opções do Garimpo: ordenar (recentes, em alta, mais vistos, antigos,
+  canal, título), mínimo de visualizações, palavras obrigatórias/proibidas no título, período, Shorts,
+  esconder vistos, buscas acompanhadas (sino), copiar links, buscar no YouTube todo, adicionar canal (@nome).
+  O feed do YouTube só traz os 15 últimos vídeos; o coletor acumula a cada hora (até 40 por canal).
+  Não há duração nem busca no arquivo antigo dos canais (isso o Garimpo faz pelo PC).
+  Para incluir canal para todos: canais.json + python scripts/icones.py + git push.
 - Sites e cidades próprios: Banca > Adicionar site (acha o feed sozinho); Ajustes > Cidades.
   Ficam só no aparelho e são lidos por ele (no app Android sempre funciona; no navegador do PC, só se o site permitir).
 - Ocultar jornal (página do jornal), escolher os blocos do Início, cor das coleções.

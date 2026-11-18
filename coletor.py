@@ -347,8 +347,22 @@ def assuntos(itens, agora):
 
 # ---------- vídeos (YouTube, pelo feed público de cada canal) ----------
 
+VIDEO_DIAS = {"imprensa": 21}   # imprensa posta muito; nos outros canais vídeo antigo ainda vale (só o teto por canal)
+VIDEO_MAX_CANAL = 40
+
+
 def coletar_videos(agora):
+    """Feed público de cada canal (15 vídeos mais recentes, sem login). Soma com o videos.json anterior,
+    então o histórico cresce a cada coleta; visualizações são atualizadas quando o vídeo volta no feed."""
     canais = json.loads((AQUI / "canais.json").read_text(encoding="utf-8"))
+    antes = {}
+    try:
+        d = json.loads((SITE / "videos.json").read_text(encoding="utf-8"))
+        cids = [c["cid"] for c in d["canais"]]
+        for x in d["itens"]:
+            antes[x[1]] = (x, cids[x[3]])
+    except (OSError, ValueError, KeyError, IndexError):
+        pass
 
     def um(c):
         url = "https://www.youtube.com/feeds/videos.xml?channel_id=" + c["cid"]
@@ -366,14 +380,30 @@ def coletar_videos(agora):
             ts = data_ts(campos["published"].text) if "published" in campos else None
             views = int(campos["statistics"].get("views", 0)) if "statistics" in campos else 0
             link = (campos["link"].get("href") or "") if "link" in campos else ""
-            if vid and ts and ts >= agora - 21 * 86400:  # canais pequenos postam pouco
+            if vid and ts:
                 vs.append([limpa(campos["title"].text or ""), vid, min(ts, agora), views, int("/shorts/" in link)])
         return c, vs, None
 
     with ThreadPoolExecutor(16) as ex:
         res = list(ex.map(um, canais))
-    lista = [{"id": c["id"], "nome": c["nome"], "ala": c["ala"], "cid": c["cid"], "n": len(vs), "erro": e} for c, vs, e in res]
-    itens = sorted(([t, v, ts, k, vw, sh] for k, (c, vs, e) in enumerate(res) for t, v, ts, vw, sh in vs), key=lambda x: -x[2])
+    k_de = {c["cid"]: k for k, (c, _, _) in enumerate(res)}
+    por_vid = {}
+    for vid, (x, cid) in antes.items():  # o que já tinha (de canais que continuam na lista)
+        if cid in k_de:
+            por_vid[vid] = [x[0], vid, x[2], k_de[cid], x[4], x[5] if len(x) > 5 else 0]
+    for k, (c, vs, e) in enumerate(res):
+        for t, v, ts, vw, sh in vs:
+            por_vid[v] = [t, v, ts, k, vw, sh]
+    itens, conta = [], {}
+    for x in sorted(por_vid.values(), key=lambda x: -x[2]):
+        c = res[x[3]][0]
+        dias = min((VIDEO_DIAS.get(t, 36500) for t in c.get("tp", ["imprensa"])), default=36500)
+        if x[2] < agora - dias * 86400 or conta.get(x[3], 0) >= VIDEO_MAX_CANAL:
+            continue
+        conta[x[3]] = conta.get(x[3], 0) + 1
+        itens.append(x)
+    lista = [{"id": c["id"], "nome": c["nome"], "ala": c.get("ala", ""), "tp": c.get("tp", ["imprensa"]), "cid": c["cid"],
+              "n": conta.get(k, 0), "erro": e} for k, (c, vs, e) in enumerate(res)]
     (SITE / "videos.json").write_text(json.dumps({"gerado": agora, "canais": lista, "itens": itens}, ensure_ascii=False,
                                                  separators=(",", ":")), encoding="utf-8")
     return len(itens), sum(1 for c in lista if c["n"])
