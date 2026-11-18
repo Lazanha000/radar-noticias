@@ -17,11 +17,24 @@ ABAS
 - Alertas e ajustes: notificações (de quais jornais, quando, temas, silêncio, limite por dia),
   tema, letra, atualização automática e cidade do clima.
 
+- Vídeos: 38 canais de notícias do YouTube (canais.json), nas 4 linhas; "Em alta" = visualizações por hora.
+- Sites e cidades próprios: Banca > Adicionar site (acha o feed sozinho); Ajustes > Cidades.
+  Ficam só no aparelho e são lidos por ele (no app Android sempre funciona; no navegador do PC, só se o site permitir).
+- Ocultar jornal (página do jornal), escolher os blocos do Início, cor das coleções.
+
+NO CELULAR (APK)
+- Widgets: "Radar: principais notícias" (1x1 = ícone; baixo = 1 manchete; maior = lista) e "Radar: busca".
+- Segurar o ícone: Buscar, Manchetes, Vídeos e suas 2 primeiras coleções.
+- Tela dividida e janela flutuante sem recarregar.
+
 RELEVÂNCIA (não há como saber os acessos dos outros sites, então é medida assim)
 - Cobertura: quantos veículos deram o mesmo fato (o coletor junta títulos com palavras raras em comum).
 - Espectro: fato coberto por várias linhas editoriais pesa mais.
 - Frescor: a nota cai pela metade a cada 8 h.
 - Você: jornais e temas que você mais abre e os que segue sobem (fica só no aparelho).
+- Sem repetição: fatos diferentes do mesmo assunto (ex.: Fachin e Alcolumbre sobre a dosimetria) viram um item só,
+  com os outros recolhidos embaixo. O coletor marca o assunto; o app ainda junta títulos com 2 palavras raras
+  em comum, sendo pelo menos uma nome próprio.
 
 COLETA (GitHub Actions, de hora em hora; não precisa do PC)
 - coletor.py lê fontes.json e grava em site/: recentes.json (72 h), antigas.json (até 30 dias),

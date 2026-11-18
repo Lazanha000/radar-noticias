@@ -1,0 +1,8 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+  <!-- o radar da marca, dentro da área segura de 66dp -->
+  <path android:fillColor="#0B2A28" android:pathData="M54,26a28,28 0,1 1,0 56a28,28 0,1 1,0 -56"/>
+  <path android:fillColor="#8C2FE3DF" android:pathData="M54,54L78.25,40A28,28 0,0 0,68 29.75Z"/>
+  <path android:fillColor="#00000000" android:strokeColor="#FF2FE3DF" android:strokeWidth="2.6" android:pathData="M54,26a28,28 0,1 1,0 56a28,28 0,1 1,0 -56M54,36a18,18 0,1 1,0 36a18,18 0,1 1,0 -36M54,46a8,8 0,1 1,0 16a8,8 0,1 1,0 -16"/>
+  <path android:fillColor="#00000000" android:strokeColor="#FF2FE3DF" android:strokeWidth="1.8" android:pathData="M54,26V82M26,54H82"/>
+  <path android:fillColor="#FFEFFFFE" android:pathData="M64,33.5m-3.2,0a3.2,3.2 0,1 1,6.4 0a3.2,3.2 0,1 1,-6.4 0M42,38m-2.8,0a2.8,2.8 0,1 1,5.6 0a2.8,2.8 0,1 1,-5.6 0"/>
+</vector>

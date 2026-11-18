@@ -742,7 +742,7 @@ function adicionarSite() {
     b.disabled = false;
     if (!r) { est.textContent = "Não achei um feed nesse endereço. Tente o endereço do feed (geralmente termina em /feed ou /rss)."; return; }
     const site = new URL(r.feed).hostname.replace(/^www\./, "");
-    const p = {id: "p-" + site.replace(/[^a-z0-9]/g, ""), nome: fd.get("nome").trim() || r.titulo.slice(0, 40) || site, ala: fd.get("ala"), site, feed: r.feed};
+    const p = {id: "p-" + site.replace(/[^a-z0-9]/g, ""), nome: fd.get("nome").trim() || r.titulo.split(/\s[:|–—-]\s|:\s/)[0].trim().slice(0, 40) || site, ala: fd.get("ala"), site, feed: r.feed};
     if (D.fontes[p.id] && !D.fontes[p.id].propria || proprias.some(x => x.id === p.id)) { est.textContent = "Esse site já está no Radar."; return; }
     proprias.push(p); guarda("proprias", proprias);
     cacheProprias[p.id] = {em: Math.floor(agora()), itens: r.itens.slice(0, 40).map(i => ({...i, ts: i.ts || Math.floor(agora())}))};

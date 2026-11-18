@@ -73,8 +73,8 @@ public class WidgetPrincipais extends AppWidgetProvider {
         servico.setData(Uri.parse("radar://widget/" + id));  // um adaptador por widget
         v.setRemoteAdapter(R.id.lista, servico);
         v.setEmptyView(R.id.lista, R.id.vazio);
-        v.setPendingIntentTemplate(R.id.lista, PendingIntent.getActivity(c, 3, new Intent(Intent.ACTION_VIEW),
-            PendingIntent.FLAG_UPDATE_CURRENT | FLAG_MUTAVEL));
+        v.setPendingIntentTemplate(R.id.lista, PendingIntent.getActivity(c, 3, new Intent(c, AbrirLink.class),
+            PendingIntent.FLAG_UPDATE_CURRENT | FLAG_MUTAVEL));  // explícito: o Android 14 recusa intent genérico mutável
         v.setOnClickPendingIntent(R.id.cabeca, abrirApp(c, "inicio", 4));
         v.setOnClickPendingIntent(R.id.atualizar, PendingIntent.getBroadcast(c, 5,
             new Intent(c, WidgetPrincipais.class).setAction(ATUALIZAR), PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));

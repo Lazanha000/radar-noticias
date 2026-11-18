@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="br.radarnoticias" android:versionCode="261118094" android:versionName="2.261118094">
+    package="br.radarnoticias" android:versionCode="263220945" android:versionName="2.263220945">
   <uses-permission android:name="android.permission.INTERNET" />
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
   <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
@@ -16,6 +16,7 @@
       </intent-filter>
       <meta-data android:name="android.app.shortcuts" android:resource="@xml/atalhos" />
     </activity>
+    <activity android:name=".AbrirLink" android:exported="false" android:theme="@android:style/Theme.Translucent.NoTitleBar" android:excludeFromRecents="true" android:noHistory="true" />
     <service android:name=".Vigia" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="false" />
     <receiver android:name=".WidgetPrincipais" android:exported="false" android:label="Radar: principais notícias">
       <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>

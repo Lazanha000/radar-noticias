@@ -4,6 +4,7 @@
     <item name="android:windowBackground">@color/fundo</item>
   </style>
   <color name="fundo">#081211</color>
+  <color name="icone_fundo">#06110F</color>
   <color name="w_fundo">#F2081211</color>
   <color name="w_texto">#EBE6D8</color>
   <color name="w_texto2">#9FB0AC</color>

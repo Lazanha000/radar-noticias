@@ -10,7 +10,7 @@ PY="$LOCALAPPDATA/Programs/Python/Python312/python.exe"
 P="$LOCALAPPDATA/Programs"
 export JAVA_HOME="$P/jdk17/jdk-17.0.21+9" PATH="$P/jdk17/jdk-17.0.21+9/bin:$PATH"
 BT="$P/android-sdk/build-tools/34.0.0" JAR="$P/android-sdk/platforms/android-34/android.jar"
-VC=$(date +%y%m%d%H%M | cut -c1-9)   # ex.: 261118143 (cabe no int do Android)
+VC=$(date +%y%j%H%M)   # ano, dia do ano, hora, minuto: ex. 263220946 (cabe no int do Android e sempre cresce)
 sed -i -E "s/android:versionCode=\"[0-9]+\" android:versionName=\"[^\"]*\"/android:versionCode=\"$VC\" android:versionName=\"2.$VC\"/" AndroidManifest.xml
 rm -rf out && mkdir -p out/classes out/gen
 
@@ -29,7 +29,7 @@ im.resize((192,192),Image.LANCZOS).save('res/mipmap/ic_launcher.png')"
 
 "$BT/aapt2" compile --dir res -o out/res.zip
 "$BT/aapt2" link -o out/base.apk -I "$JAR" --manifest AndroidManifest.xml out/res.zip --java out/gen --min-sdk-version 24 --target-sdk-version 34 --auto-add-overlay
-javac -source 8 -target 8 -bootclasspath "$JAR" -nowarn -Xlint:-options -d out/classes src/br/radarnoticias/*.java out/gen/br/radarnoticias/R.java
+javac -encoding UTF-8 -source 8 -target 8 -bootclasspath "$JAR" -nowarn -Xlint:-options -d out/classes src/br/radarnoticias/*.java out/gen/br/radarnoticias/R.java
 "$BT/d8.bat" --release --lib "$JAR" --min-api 24 --output out $(find out/classes -name "*.class")
 "$PY" -c "import zipfile; zipfile.ZipFile('out/base.apk','a').write('out/classes.dex','classes.dex')"
 "$BT/zipalign.exe" -f -p 4 out/base.apk out/alinhado.apk
