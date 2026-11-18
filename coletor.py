@@ -7,7 +7,7 @@ sobre o mesmo fato. O tamanho do grupo (quantos veículos e de quantas linhas ed
 Uso: python coletor.py           (coleta e grava)
      python coletor.py --testar  (só mostra quantos itens cada fonte deu)
      python coletor.py --grupos  (mostra os maiores grupos, para conferir o agrupamento)"""
-import html, json, math, re, sys, time, unicodedata, urllib.request
+import html, json, math, re, sys, time, unicodedata, urllib.error, urllib.request
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
@@ -162,11 +162,19 @@ LEITORES = {"wp": parse_wp, "ofuturo": parse_ofuturo, "desc": parse_desc, "news"
 
 
 def baixar(fonte):
-    try:
-        with urllib.request.urlopen(urllib.request.Request(fonte["feed"], headers=UA), timeout=25) as r:
-            return fonte, LEITORES.get(fonte.get("tipo"), parse_feed)(r.read()), None
-    except Exception as e:
-        return fonte, [], f"{type(e).__name__}: {e}"[:160]
+    erro = None
+    for cab in (UA, {"User-Agent": UA["User-Agent"], "Accept": "*/*"}):  # alguns servidores recusam o Accept de feed (415)
+        try:
+            with urllib.request.urlopen(urllib.request.Request(fonte["feed"], headers=cab), timeout=25) as r:
+                return fonte, LEITORES.get(fonte.get("tipo"), parse_feed)(r.read()), None
+        except urllib.error.HTTPError as e:
+            erro = f"HTTPError: {e}"
+            if e.code not in (406, 415):
+                break
+        except Exception as e:
+            erro = f"{type(e).__name__}: {e}"
+            break
+    return fonte, [], erro[:160]
 
 
 # ---------- classificação ----------
