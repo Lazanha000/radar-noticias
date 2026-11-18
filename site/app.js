@@ -964,7 +964,7 @@ function vBusca() {
   let espera;
   const roda = () => { f.q = q.value.trim(); guarda("ultimaBusca", f.q); f.q ? feed($("#corpo"), f) : ($("#corpo").innerHTML = `<p class="rodape">Busca por palavras, sem acento obrigatório. Use "aspas" para frase exata.</p>`); };
   q.oninput = () => { clearTimeout(espera); espera = setTimeout(roda, 140); };
-  q.onkeydown = e => e.key === "Enter" && q.blur();
+  q.onkeydown = e => { if (e.key === "Enter") q.blur(); };  // sem chaves, o "false" das outras teclas cancelava a digitação
   $("#limpaq").onclick = () => { q.value = ""; roda(); q.focus(); };
   roda(); if (!f.q) q.focus();
 }
