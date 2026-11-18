@@ -1007,7 +1007,9 @@ function vBusca() {
   let espera;
   const roda = () => { f.q = q.value.trim(); guarda("ultimaBusca", f.q); f.q ? feed($("#corpo"), f) : ($("#corpo").innerHTML = `<p class="rodape">Busca por palavras, sem acento obrigatório. Use "aspas" para frase exata.</p>`); };
   q.oninput = () => { clearTimeout(espera); espera = setTimeout(roda, 140); };
-  q.onkeydown = e => e.key === "Enter" && q.blur();
+  // corpo com chaves: "e.key === 'Enter' && ..." devolvia false nas outras teclas, e handler on* que devolve false
+  // cancela a tecla (no PC nada era digitado; no celular passava porque o teclado virtual digita por composição)
+  q.onkeydown = e => { if (e.key === "Enter") q.blur(); };
   $("#limpaq").onclick = () => { q.value = ""; roda(); q.focus(); };
   roda(); if (!f.q) q.focus();
 }
