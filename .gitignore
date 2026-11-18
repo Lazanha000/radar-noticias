@@ -8,3 +8,5 @@ __pycache__/
 android/out/
 android/*.idsig
 android/*.keystore
+site/regiao.json
+site/regiao-antigo.json

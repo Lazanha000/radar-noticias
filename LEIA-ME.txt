@@ -22,6 +22,13 @@ ABAS
   Ficam só no aparelho e são lidos por ele (no app Android sempre funciona; no navegador do PC, só se o site permitir).
 - Ocultar jornal (página do jornal), escolher os blocos do Início, cor das coleções.
 
+- Região (Vale do Jequitinhonha): usa os dados do Radar do Vale (repositório radar-vale). O coletor lê o
+  noticias.js publicado e grava site/regiao.json (30 dias sem eleição + todo o legislativo de 90 dias) e
+  site/regiao-antigo.json (eleições e o resto dos 90 dias, baixado só quando você pede).
+  Abas Notícias, Prefeituras e Câmaras e leis (aprovações, projetos, sessões, atos; ranking por cidade),
+  filtros de cidade, período, assunto, eleições e "cidade no título". Nas cidades do Vale, o bloco
+  Notícias locais do Início também usa esses dados.
+
 NO CELULAR (APK)
 - Widgets: "Radar: principais notícias" (1x1 = ícone; baixo = 1 manchete; maior = lista) e "Radar: busca".
 - Segurar o ícone: Buscar, Manchetes, Vídeos e suas 2 primeiras coleções.

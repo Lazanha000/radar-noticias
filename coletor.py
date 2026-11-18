@@ -379,6 +379,47 @@ def coletar_videos(agora):
     return len(itens), sum(1 for c in lista if c["n"])
 
 
+# ---------- região (dados do Radar do Vale) ----------
+
+VALE = "https://lazanha000.github.io/radar-vale/noticias.js"
+REGIAO_DIAS = 90
+
+
+def coletar_regiao(agora):
+    """Lê o que o Radar do Vale publica (imprensa, prefeituras, câmaras, leis e Assembleia dos 51 municípios)
+    e grava site/regiao.json só com os últimos 90 dias e campos curtos: o arquivo original tem 4 MB."""
+    try:
+        with urllib.request.urlopen(urllib.request.Request(VALE, headers=UA), timeout=60) as r:
+            t = r.read().decode("utf-8")
+        d = json.loads(t[t.index("{"):t.rstrip().rstrip(";").rindex("}") + 1])
+    except Exception as e:
+        print("região: sem dados do Radar do Vale:", e)
+        return 0
+    muns = d["municipios"] + ["Vale do Jequitinhonha"]
+    idx = {m: k for k, m in enumerate(muns)}
+    limite = agora - REGIAO_DIAS * 86400
+    itens = []
+    for i in d["itens"]:
+        ts = data_ts(i.get("d"))
+        if not ts or ts < limite or not str(i.get("u", "")).startswith("http"):
+            continue
+        r = i.get("r") or ""
+        r = "" if r.startswith(i["t"][:40]) else (r if len(r) <= RESUMO else r[:RESUMO].rsplit(" ", 1)[0] + "…")
+        itens.append([i["t"], i["u"], min(ts, agora), i.get("f", ""), i["k"], [idx[m] for m in i.get("m", []) if m in idx],
+                      int(bool(i.get("a"))), int(bool(i.get("e"))), i.get("lg") or "", i.get("as") or [], int(i.get("c", True) is not False), r])
+    itens.sort(key=lambda x: -x[2])
+    gerado = data_ts(d.get("gerado")) or agora
+    # principal: 30 dias sem eleição + todo o legislativo (é pouco e é o que interessa); o resto vai para o antigo,
+    # que o app só baixa quando você pede eleições ou período maior
+    LEG = {"camara", "lei", "proposicao", "assembleia"}
+    corte = agora - 30 * 86400
+    leve = lambda x: x[4] in LEG or (x[2] >= corte and not x[7])
+    for nome, parte in (("regiao.json", [x for x in itens if leve(x)]), ("regiao-antigo.json", [x for x in itens if not leve(x)])):
+        (SITE / nome).write_text(json.dumps({"gerado": gerado, "municipios": muns, "assuntos": d["assuntos"], "itens": parte},
+                                            ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    return len(itens)
+
+
 # ---------- coleta e gravação ----------
 
 def carregar_anterior():
@@ -529,3 +570,4 @@ if __name__ == "__main__":
         gravar(saude, itens, agora)
         print(f"{coletar_locais(agora)} notícias locais")
         print("%d vídeos de %d canais" % coletar_videos(agora))
+        print(f"{coletar_regiao(agora)} itens da região (Radar do Vale)")

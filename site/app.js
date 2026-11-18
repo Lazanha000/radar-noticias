@@ -331,7 +331,7 @@ function lista(el, itens, opts = {}) {
 
 // ---------- vistas ----------
 let vistaAtual = "", secao = le("secao", "destaques"), filtroAtual = null;
-const SECOES = () => [["destaques", "Destaques"], ["manchetes", "Manchetes"], ["b", "Brasil"], ["m", "Mundo"], ...Object.entries(D.temas)];
+const SECOES = () => [["destaques", "Destaques"], ["manchetes", "Manchetes"], ["regiao", "Vale"], ["b", "Brasil"], ["m", "Mundo"], ...Object.entries(D.temas)];
 
 function render() {
   $("#novidade").hidden = true;
@@ -342,7 +342,7 @@ function render() {
   vistaAtual = location.hash;
   if (!D.itens.length) { $("#vista").innerHTML = `<div class="vazio">Carregando notícias…</div>`; return; }
   ({inicio: vInicio, colecoes: vColecoes, colecao: vColecao, banca: vBanca, fonte: vFonte, alertas: vAlertas,
-    busca: vBusca, historia: vHistoria, videos: vVideos}[v] || vInicio)(arg);
+    busca: vBusca, historia: vHistoria, videos: vVideos, regiao: vRegiao}[v] || vInicio)(arg);
   if (mudou) window.scrollTo(0, 0);
 }
 
@@ -358,7 +358,7 @@ function vInicio() {
   $("#vista").innerHTML = cabecalho("Suas notícias", hoje, `<a class="clima" id="clima" href="#alertas" hidden></a>`)
     + `<nav class="trilho" aria-label="Seções">${SECOES().map(([k, n]) => `<button data-s="${k}" aria-pressed="${k === secao}">${esc(n)}</button>`).join("")}</nav>`
     + `<div id="corpo"></div>`;
-  $(".trilho").onclick = e => { const b = e.target.closest("button"); if (!b) return; secao = b.dataset.s; guarda("secao", secao); vInicio(); };
+  $(".trilho").onclick = e => { const b = e.target.closest("button"); if (!b) return; if (b.dataset.s === "regiao") { location.hash = "#regiao"; return; } secao = b.dataset.s; guarda("secao", secao); vInicio(); };
   rolaAte($(".trilho [aria-pressed=true]"));
   clima();
   if (secao === "destaques") return destaques();
@@ -434,6 +434,10 @@ function destaques() {
 // cidades: as do coletor (locais.json) e as que você adicionou
 const listaCidades = () => cidades || (D.locais?.locais || []).map(l => ({nome: l.nome, lat: l.lat, lon: l.lon}));
 async function noticiasDaCidade(c) {
+  // cidades do Vale: os dados completos do Radar do Vale (imprensa, prefeitura e câmara), sem eleição
+  const R = await carregarRegiao().catch(() => null);
+  const k = R ? R.muns.indexOf(c.nome) : -1;
+  if (k >= 0) return R.itens.filter(i => i.m.includes(k) && !i.e && i.c && (i.k === "imprensa" || i.k === "prefeitura" || (i.k !== "assembleia" && (i.a || i.lg === "aprovado")))).slice(0, 20).map(i => [i.t, i.u, i.ts, i.f]);
   const doColetor = D.locais?.locais.find(l => l.nome === c.nome);
   if (doColetor && !c.busca) return doColetor.itens;
   const cache = le("cidade:" + c.nome, null);
@@ -456,7 +460,7 @@ async function locais() {
   let atual = le("local", cs[0].nome), aberto = false;
   const pinta = async () => {
     const c = cs.find(x => x.nome === atual) || cs[0];
-    el.innerHTML = `<h2>Notícias locais <a href="#alertas/cidades">Cidades ${ic("seta")}</a></h2><div class="chips">${cs.map(x => `<button aria-pressed="${x.nome === c.nome}" data-l="${esc(x.nome)}">${esc(x.nome)}</button>`).join("")}</div><div class="its"><div class="vazio">Carregando…</div></div>`;
+    el.innerHTML = `<h2>Notícias locais <a href="#regiao">Vale do Jequitinhonha ${ic("seta")}</a></h2><div class="chips">${cs.map(x => `<button aria-pressed="${x.nome === c.nome}" data-l="${esc(x.nome)}">${esc(x.nome)}</button>`).join("")}</div><div class="its"><div class="vazio">Carregando…</div></div>`;
     rolaAte(el.querySelector(".chips [aria-pressed=true]"));
     let its;
     try { its = await noticiasDaCidade(c); } catch (e) {
@@ -498,6 +502,104 @@ async function clima() {
     el.setAttribute("aria-label", `${w.t} graus, ${nome}, em ${c.nome}. Mudar cidade`);
     el.hidden = false;
   } catch (e) { /* sem clima: segue sem o quadro */ }
+}
+
+// ---------- região (Vale do Jequitinhonha, dados do Radar do Vale) ----------
+const TIPO = {imprensa: "Imprensa", prefeitura: "Prefeitura", camara: "Câmara", lei: "Lei", proposicao: "Proposição", assembleia: "Assembleia de MG"};
+const CAT = {"": "Tudo", aprovado: "Aprovações", projeto: "Projetos", sessao: "Sessões", norma: "Portarias e atos"};
+let regiaoP = null, regiaoAntigo = null;
+function lerRegiao(d, destino) {
+  for (const [t, u, ts, f, k, m, a, e, lg, as, c, r] of d.itens)
+    if (/^https?:\/\//.test(u)) destino.push({t, u, ts, f, k, m, a, e, lg, as, c, r, n: norm(t + " " + r + " " + f)});
+}
+function carregarRegiao() {
+  return regiaoP = regiaoP || baixar("regiao.json").then(d => {
+    const R = {muns: d.municipios, assuntos: d.assuntos, gerado: d.gerado, itens: []};
+    lerRegiao(d, R.itens);
+    return D.regiao = R;
+  }).catch(e => { regiaoP = null; throw e; });
+}
+// eleições e mais de 30 dias ficam num segundo arquivo, baixado só quando pedido
+function carregarRegiaoAntigo() {
+  return regiaoAntigo = regiaoAntigo || baixar("regiao-antigo.json").then(d => {
+    lerRegiao(d, D.regiao.itens); D.regiao.itens.sort((a, b) => b.ts - a.ts); D.regiao.completo = true;
+  }).catch(e => { regiaoAntigo = null; throw e; });
+}
+const fR = Object.assign({aba: "noticias", mun: null, cat: "", assunto: "", eleicao: false, titulo: false, q: "", periodo: 30}, le("regiao", {}));
+async function vRegiao() {
+  $("#vista").innerHTML = cabecalho("Vale do Jequitinhonha", "Carregando…");
+  let R;
+  try { R = await carregarRegiao(); } catch (e) { $("#vista .data").textContent = "Sem conexão."; return; }
+  const f = fR, nomeMun = k => R.muns[k];
+  if (f.mun === null) f.mun = R.muns.includes(cfg.cidade) ? cfg.cidade : "";
+  const ABAS_R = [["noticias", "Notícias"], ["prefeituras", "Prefeituras"], ["camaras", "Câmaras e leis"]];
+  const doTipo = i => f.aba === "noticias" ? i.k === "imprensa" : f.aba === "prefeituras" ? i.k === "prefeitura" : i.k !== "imprensa" && i.k !== "prefeitura";
+  const ehAprov = i => i.a || i.lg === "aprovado";
+  const pinta = () => {
+    guarda("regiao", f);
+    const k = f.mun ? R.muns.indexOf(f.mun) : -1, q = termos(f.q), lim = agora() - f.periodo * 86400, leg = f.aba === "camaras";
+    const base = R.itens.filter(i => doTipo(i) && i.ts >= lim && (k < 0 || i.m.includes(k)) && (f.eleicao || !i.e) && (!f.titulo || i.c)
+      && (!f.assunto || i.as.includes(f.assunto)) && q.every(t => i.n.includes(t)));
+    const itens = leg ? base.filter(i => f.cat === "aprovado" ? ehAprov(i) : f.cat ? i.lg === f.cat : i.lg !== "outro") : base;
+    const conta = {};
+    if (leg) for (const i of base) { const c = ehAprov(i) ? "aprovado" : i.lg; conta[c] = (conta[c] || 0) + 1; }
+    let ranking = "";
+    if (leg) {  // aprovações por cidade, como no Radar do Vale
+      const n = {};
+      for (const i of base) if (ehAprov(i)) for (const m of i.m) if (nomeMun(m) !== "Vale do Jequitinhonha") n[m] = (n[m] || 0) + 1;
+      const top = Object.entries(n).sort((a, b) => b[1] - a[1]).slice(0, 12);
+      if (top.length) ranking = `<section class="bloco ranking"><h2>Aprovações por cidade</h2><div class="chips quebra">${top.map(([m, c]) => `<button data-mun="${esc(nomeMun(+m))}" aria-pressed="${f.mun === nomeMun(+m)}">${esc(nomeMun(+m))} · ${c}</button>`).join("")}</div></section>`;
+    }
+    $("#corpo").innerHTML = `<div class="ferr"><select id="rmun" class="sel" aria-label="Cidade"><option value="">Todo o Vale (51 cidades)</option>${R.muns.filter(m => m !== "Vale do Jequitinhonha").map(m => `<option ${m === f.mun ? "selected" : ""}>${esc(m)}</option>`).join("")}</select>`
+      + `<select id="rper" class="sel" aria-label="Período">${[[7, "7 dias"], [30, "30 dias"], [90, "90 dias"]].map(([d, n]) => `<option value="${d}" ${f.periodo === d ? "selected" : ""}>${n}</option>`).join("")}</select>`
+      + `<span class="cont">${itens.length} ${itens.length === 1 ? "item" : "itens"}</span></div>`
+      + (leg ? `<div class="chips">${Object.entries(CAT).map(([c, n]) => `<button data-cat="${c}" aria-pressed="${f.cat === c}">${n}${c && conta[c] ? " · " + conta[c] : ""}</button>`).join("")}</div>`
+        : `<div class="chips"><button data-as="" aria-pressed="${!f.assunto}">Todos os assuntos</button>${Object.entries(R.assuntos).map(([a, n]) => `<button data-as="${a}" aria-pressed="${f.assunto === a}">${esc(n)}</button>`).join("")}</div>`)
+      + `<div class="ferr">${f.aba === "noticias" ? `<label class="mini"><input type="checkbox" class="chave" id="rel" ${f.eleicao ? "checked" : ""}>Eleições</label>` : ""}`
+      + `<label class="mini"><input type="checkbox" class="chave" id="rtit" ${f.titulo ? "checked" : ""}>Só com a cidade no título</label></div>`
+      + ranking + `<div class="lista" id="rlista"></div>`
+      + `<p class="rodape">Dados do <a href="https://lazanha000.github.io/radar-vale/" target="_blank" rel="noopener">Radar do Vale</a>: imprensa (Google Notícias e veículos regionais), sites das prefeituras e câmaras, leis (SAPL e portais) e Assembleia de MG. Coleta ${quando(R.gerado)}.</p>`;
+    lista($("#rlista"), itens, {vazio: "Nada com esses filtros.", desenha: i => `<article class="n"><div class="fonte"><span class="ico-f">${inicial(i.f)}</span><span class="nm">${esc(i.f)}</span></div>`
+      + `<h3><a href="${esc(i.u)}" target="_blank" rel="noopener">${esc(i.t)}</a></h3>${i.r ? `<p class="res">${esc(i.r)}</p>` : ""}`
+      + `<div class="meta"><span>${quando(i.ts)}</span><span class="etq">${esc(i.m.map(nomeMun).filter(m => m !== "Vale do Jequitinhonha").slice(0, 3).join(", ") || "Vale")}</span>`
+      + (i.k !== "imprensa" ? `<span class="etq">${TIPO[i.k] || i.k}</span>` : "")
+      + (ehAprov(i) ? '<span class="etq ap">aprovação</span>' : leg && CAT[i.lg] ? `<span class="etq">${CAT[i.lg]}</span>` : "")
+      + (i.c ? "" : '<span class="etq incerta">cidade só no texto</span>')
+      + (i.as || []).slice(0, 2).map(a => `<span class="etq">${esc(R.assuntos[a] || a)}</span>`).join("") + `</div></article>`});
+  };
+  $("#vista").innerHTML = `<button class="voltar" onclick="location.hash='#inicio'">${ic("voltar")}Início</button>`
+    + cabecalho("Vale do Jequitinhonha", "Notícias, prefeituras e câmaras dos 51 municípios")
+    + `<nav class="trilho" aria-label="Partes">${ABAS_R.map(([a, n]) => `<button data-aba="${a}" aria-pressed="${f.aba === a}">${n}</button>`).join("")}</nav>`
+    + `<label class="campo-busca">${ic("busca")}<input type="search" id="rq" placeholder="Buscar na região" aria-label="Buscar na região" value="${esc(f.q)}"></label><div id="corpo"></div>`;
+  const repinta = () => {
+    if ((f.eleicao || f.periodo > 30) && !R.completo) {
+      $("#rlista") && ($("#rlista").innerHTML = '<div class="vazio">Carregando…</div>');
+      carregarRegiaoAntigo().then(pinta, pinta);
+    } else pinta();
+  };
+  $(".trilho").onclick = e => {
+    const b = e.target.closest("[data-aba]"); if (!b) return;
+    f.aba = b.dataset.aba; f.cat = "";
+    document.querySelectorAll(".trilho button").forEach(x => x.setAttribute("aria-pressed", x === b));
+    repinta();
+  };
+  $("#corpo").onclick = e => {
+    const b = e.target.closest("button"); if (!b) return;
+    if ("cat" in b.dataset) f.cat = b.dataset.cat;
+    else if ("as" in b.dataset) f.assunto = b.dataset.as;
+    else if (b.dataset.mun) f.mun = f.mun === b.dataset.mun ? "" : b.dataset.mun;
+    else return;
+    repinta();
+  };
+  $("#corpo").onchange = e => {
+    const t = e.target;
+    if (t.id === "rmun") f.mun = t.value; else if (t.id === "rper") f.periodo = +t.value;
+    else if (t.id === "rel") f.eleicao = t.checked; else if (t.id === "rtit") f.titulo = t.checked; else return;
+    repinta();
+  };
+  let espera;
+  $("#rq").oninput = e => { clearTimeout(espera); espera = setTimeout(() => { f.q = e.target.value; pinta(); }, 140); };
+  repinta();
 }
 
 // ---------- vídeos ----------

@@ -326,3 +326,10 @@ details.sobre p,details.sobre li{color:var(--tx2);font-size:.88rem}
   .nav a{font-size:.64rem}
   .nav a span.pilula{width:44px}
 }
+
+/* região */
+.etq{background:var(--sup2);border-radius:6px;padding:1px 7px;font-size:.72rem;color:var(--tx2)}
+.etq.ap{background:var(--ac);color:var(--ac-tx);font-weight:700}
+.etq.incerta{background:none;border:1px dashed var(--tx3);font-style:italic}
+.chips.quebra{flex-wrap:wrap;overflow:visible}
+.ranking{margin-top:12px}
