@@ -1,0 +1,41 @@
+name: Coletar e publicar
+
+on:
+  schedule:
+    - cron: "23 * * * *"  # de hora em hora
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: coleta
+  cancel-in-progress: false
+
+jobs:
+  coletar:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: pip install defusedxml
+      - run: python test_coletor.py
+      # o histórico fica só no site publicado (não no repositório, para ele não inchar)
+      - name: Baixar o que já foi publicado
+        run: |
+          for f in recentes antigas; do curl -sfL "https://lazanha000.github.io/radar-noticias/$f.json" -o "site/$f.json" || rm -f "site/$f.json"; done
+      - run: python coletor.py
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v5

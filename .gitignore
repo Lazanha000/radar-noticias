@@ -1,0 +1,5 @@
+site/*.json
+__pycache__/
+android/out/
+android/*.idsig
+android/*.keystore

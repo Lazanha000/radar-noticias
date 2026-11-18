@@ -1,0 +1,31 @@
+RADAR - notícias de todo o espectro
+Junta o Radar do Vale (marca e esquema de coleta) com a lista de imprensa da Biblioteca Marxista.
+4 linhas: esquerda radical, esquerda moderada/liberal, imprensa burguesa e direita.
+
+ABRIR
+- Celular: instale android\radar.apk (permitir "fontes desconhecidas").
+- PC: atalho "Radar" (abre https://lazanha000.github.io/radar-noticias/).
+
+POR QUE É RÁPIDO
+O GitHub coleta todos os feeds de hora em hora e publica 2 arquivos prontos:
+recentes.json (últimas 72 h, ~150 KB comprimido) e antigas.json (até 30 dias / 20 mil notícias),
+que só é baixado quando você busca, filtra por veículo, escolhe 7 dias ou chega ao fim da lista.
+A busca roda na memória do aparelho (cerca de 1 ms), sem consultar site por site.
+
+EDITAR FONTES
+- fontes.json: id, nome, ala (radical | moderada | burguesa | direita), site, feed.
+  "tipo": "wp" (API do WordPress), "desc" (manchete na descrição, como o UOL), "ofuturo" (lê a página).
+- Testar sem gravar:  python coletor.py --testar
+- Testes dos leitores: python test_coletor.py
+- Depois de mudar, envie ao GitHub (git push) e a próxima coleta já usa.
+- Para ver no PC antes de publicar: python coletor.py  e  python -m http.server -d site
+
+ARQUIVOS
+coletor.py      coleta e grava site\recentes.json e site\antigas.json
+site\           o app (index.html, uma página só)
+android\        APK que abre o site; build.sh monta (bash android/build.sh)
+.github\        coleta automática de hora em hora (GitHub Actions + Pages)
+
+LIMITES
+- Só título, resumo e link; a notícia completa abre no site original.
+- Sites que bloqueiam servidores fora do Brasil podem falhar na nuvem: veja "Fontes" no fim do app.
