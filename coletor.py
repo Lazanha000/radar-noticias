@@ -3,10 +3,12 @@
   antigas.json   até 30 dias (só quando o app precisa)
   alertas.json   últimas 6 h, pequeno, para as notificações do celular
 Cada notícia ganha temas, região (Brasil/mundo), países e um grupo: notícias de veículos diferentes
-sobre o mesmo fato. O tamanho do grupo (quantos veículos e de quantas linhas editoriais) é a base da relevância.
+sobre o mesmo fato, e um assunto (fatos diferentes sobre a mesma coisa). Os principais do dia (assuntos mais
+cobertos em 24 h, por quantos veículos e de quantas linhas) vão prontos em recentes.json e widget.json.
 Uso: python coletor.py           (coleta e grava)
      python coletor.py --testar  (só mostra quantos itens cada fonte deu)
-     python coletor.py --grupos  (mostra os maiores grupos, para conferir o agrupamento)"""
+     python coletor.py --grupos  (mostra os maiores grupos, para conferir o agrupamento)
+     python coletor.py --principais  (mostra os principais do dia, na ordem e com a nota)"""
 import html, json, math, re, sys, time, unicodedata, urllib.error, urllib.request
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
@@ -298,51 +300,212 @@ def agrupar(itens, agora):
                 m["g"] = gid
 
 
+# ---------- assuntos e principais do dia ----------
+# Fato (grupo) = a mesma notícia em vários veículos. Assunto = vários fatos sobre a mesma coisa
+# (ex.: "PF entrega relatório a Fachin", "Andrei vai ao Senado", "Resumão: caso Master").
+# Principais = os assuntos que mais veículos, de mais linhas editoriais, cobriram ao longo do DIA,
+# escolhidos sem repetir assunto.
+
+JANELA_ASSUNTO_H = 36   # junta fatos desta janela num mesmo assunto
+DIA_H = 24              # principais: o que saiu nas últimas 24 h
+MEIA_VIDA_DIA_H = 18    # peso de uma notícia de 18 h atrás = metade da de agora (antes: 8 h, só dava as últimas horas)
+LIMIAR_ASSUNTO = 0.25   # cosseno mínimo com o centro do assunto
+N_PRINCIPAIS = 40
+
+_VAZIAS = set(norm("""apos sobre contra entre ainda podera pode deve sera seria foram veja saiba entenda video vivo assista
+confira leia ouca acompanhe resumao diario analise edicao programa episodio podcast coluna opiniao artigo editorial
+brasileiro brasileira brasileiros brasil governo presidente milhoes bilhoes""").split())
+# serviço e entretenimento leve: muitos veículos publicam, mas não é "a notícia do dia"
+_LEVE = re.compile(r"\b(onde assistir|ao vivo|horario e escalac|escalacoes|palpite|mega-sena|mega da virada|lotofacil|quina|"
+                   r"lotomania|loteria|horoscopo|signo|bbb|a fazenda|big brother|novela|capitulos?|spoiler|gabarito|resumao|previsao do tempo|"
+                   r"concurso .*inscric|como assistir|que horas|programacao|cupom|black friday|quiz)\b")
+
+
+def _raiz(w):
+    return w[:7]  # "ministro", "ministros", "ministra" -> "ministr"
+
+
+def _palavras(t):
+    return [_raiz(w) for w in re.findall(r"[a-z0-9]{3,}", norm(t)) if w not in PARADAS and w not in _VAZIAS and not w.isdigit()]
+
+
+def _nomes(t):
+    ws = t.split()
+    return {_raiz(norm(w)) for w in re.findall(r"[A-ZÀ-Ý][\wÀ-ÿ'-]{2,}", " ".join(ws[1:]))}
+
+
+def _cos(a, b):
+    if len(a) > len(b):
+        a, b = b, a
+    return sum(x * b.get(w, 0) for w, x in a.items())
+
+
+def _unitario(v):
+    n = math.sqrt(sum(x * x for x in v.values())) or 1
+    return {w: x / n for w, x in v.items()}
+
+
+def _distintas(ws, vizinhas):
+    """Quantas palavras distintas, contando como uma só as vizinhas no título ("Reino Unido", "big techs"):
+    senão "Reino Unido" sozinho já juntaria inflação britânica com sanções a Israel."""
+    grupo = {w: w for w in ws}
+    raiz = lambda w: w if grupo[w] == w else raiz(grupo[w])
+    for a, b in vizinhas:
+        if a in grupo and b in grupo:
+            grupo[raiz(a)] = raiz(b)
+    return len({raiz(w) for w in ws})
+
+
 def assuntos(itens, agora):
-    """Grava i['a']: fatos diferentes sobre o mesmo assunto (ex.: "Fachin diz que STF julga dosimetria" e
-    "Alcolumbre pede a Moraes julgamento da dosimetria"). O app mostra um assunto por vez, sem repetir."""
+    """Grava i['a'] (assunto) em cada notícia das últimas 36 h; devolve os assuntos [{'id', 'hist', 'cent'}].
+    Cada fato vira um vetor de palavras (títulos com peso 1, resumos 0,35, nomes próprios +0,5) pesado por raridade;
+    entra no assunto cujo centro for mais parecido (cosseno >= 0,25) e com pelo menos 2 palavras raras em comum
+    (palavras vizinhas no título contam como uma; com cosseno >= 0,40 basta uma).
+    Comparar com o centro, e não com o último fato, evita a corrente "A parece B, B parece C"."""
     for i in itens:
         i["a"] = 0
-    janela = [i for i in itens if i["ts"] >= agora - JANELA_GRUPO_H * 3600]
+    janela = [i for i in itens if i["ts"] >= agora - JANELA_ASSUNTO_H * 3600]
     if not janela:
-        return
-    # história = um fato (grupo) ou uma notícia sozinha
+        return []
     hist = defaultdict(list)
     for i in janela:
         hist[("g", i["g"]) if i["g"] else ("u", i["u"])].append(i)
     hist = list(hist.values())
-    fs = [Counter(w for m in h for w in fichas(m["t"])) for h in hist]
-    # núcleo: palavras que aparecem em pelo menos 30% dos títulos da história
-    nucleo = [{w for w, c in f.items() if c >= max(1, math.ceil(0.3 * len(h)))} for f, h in zip(fs, hist)]
-    df = Counter(w for n in nucleo for w in n)
+    vet, vizinhas = [], []
+    for h in hist:
+        v, par = Counter(), set()
+        for m in h[:10]:
+            ws = _palavras(m["t"])
+            par.update(zip(ws, ws[1:]))
+            for w in set(ws):
+                v[w] += 1.0
+            for w in set(_palavras(m.get("r", ""))):
+                v[w] += 0.35
+            for w in _nomes(m["t"]):
+                v[w] += 0.5
+        vet.append({w: math.sqrt(c) for w, c in v.items()})
+        vizinhas.append(par)
     n = len(hist)
-    peso = {w: math.log(n / c) for w, c in df.items() if c <= max(6, n * 0.03)}
-    rara = {w for w, c in df.items() if c <= max(3, n * 0.012)}
-    ordem = sorted(range(n), key=lambda k: -len({m["f"] for m in hist[k]}))
-    dono, por_palavra, sementes = {}, defaultdict(list), []
+    df = Counter(w for v in vet for w in v)
+    rara = max(3, n * 0.012)
+    P = [_unitario({w: c * math.log(n / df[w]) for w, c in v.items() if df[w] <= max(4, n * 0.05)}) for v in vet]
+    nf = lambda h: len({m["f"] for m in h})
+    ordem = sorted(range(n), key=lambda k: (-nf(hist[k]), -max(m["ts"] for m in hist[k])))
+    tops, soma, por_palavra = [], [], defaultdict(set)
     for k in ordem:
-        a = nucleo[k]
+        p = P[k]
         melhor, nota = None, 0.0
-        for t in {t for w in a & rara for t in por_palavra[w]}:
-            b_ = nucleo[sementes[t]]
-            comuns = [w for w in a & b_ if w in peso]
-            if not any(w in rara for w in comuns) or len(comuns) < 2:
-                continue
-            menor = min(sum(peso.get(w, 0) for w in a), sum(peso.get(w, 0) for w in b_)) or 1
-            s_ = sum(peso[w] for w in comuns) / menor
-            if s_ > nota:
-                melhor, nota = t, s_
-        if melhor is None or nota < 0.28:
-            melhor = len(sementes)
-            sementes.append(k)
-            for w in a & rara:
-                por_palavra[w].append(melhor)
-        dono[k] = melhor
-    tamanho = Counter(dono.values())
-    for k, h in enumerate(hist):
-        if tamanho[dono[k]] > 1:
+        for t in {t for w in p if df[w] <= rara for t in por_palavra[w]}:
+            c = _cos(p, tops[t]["cent"])
+            fortes = _distintas([w for w in p if df[w] <= rara and w in tops[t]["cent"]], vizinhas[k])
+            if (fortes >= 2 or c >= 0.4) and c > nota:
+                melhor, nota = t, c
+        if melhor is None or nota < LIMIAR_ASSUNTO:
+            melhor = len(tops)
+            tops.append({"id": melhor + 1, "hist": [], "cent": {}, "viz": set()})
+            soma.append(Counter())
+        tops[melhor]["hist"].append(hist[k])
+        tops[melhor]["viz"] |= vizinhas[k]
+        soma[melhor].update(p)
+        tops[melhor]["cent"] = _unitario(soma[melhor])
+        for w in p:
+            if df[w] <= rara:
+                por_palavra[w].add(melhor)
+    for T in tops:
+        for h in T["hist"]:
             for m in h:
-                m["a"] = dono[k] + 1
+                m["a"] = T["id"]
+    return tops
+
+
+def principais(tops, fontes, agora, itens=()):
+    """Ordena os assuntos do dia e escolhe os principais sem repetir assunto.
+    nota = cobertura × (1 + profundidade) × leveza
+      cobertura: para cada linha editorial, log(1 + soma dos veículos dela), cada veículo pesando pelo horário da
+        sua notícia mais nova sobre o assunto (meia-vida 18 h) e um pouco mais se publica pouco (escolheu cobrir);
+        somar por linha faz o assunto que todo o espectro cobriu passar à frente do que só uma linha deu;
+      profundidade: quantos fatos diferentes o assunto teve no dia (história que se desenrola);
+      leveza: serviço e entretenimento ("onde assistir", loterias, novela) e só esporte/cultura pesam menos.
+    Na escolha, um assunto parecido com um já escolhido vira parte dele (não ocupa outro lugar), e temas repetidos
+    perdem um pouco depois do 3º, para a lista não ser só política ou só economia."""
+    ala = {f["id"]: f["ala"] for f in fontes}
+    corte = agora - DIA_H * 3600
+    vol = Counter(i["f"] for i in itens if i["ts"] >= corte)
+    med = sorted(vol.values())[len(vol) // 2] if vol else 1
+    peso_f = {f: min(1.3, max(0.75, (med / c) ** 0.2)) for f, c in vol.items()}
+    cand = []
+    for T in tops:
+        dia = [m for h in T["hist"] for m in h if m["ts"] >= corte]
+        if not dia:
+            continue
+        ultimo = {}
+        for m in dia:
+            ultimo[m["f"]] = max(ultimo.get(m["f"], 0), m["ts"])
+        por_ala = defaultdict(float)
+        for f, ts in ultimo.items():
+            por_ala[ala.get(f, "")] += peso_f.get(f, 1) * 0.5 ** (max(0, agora - ts) / 3600 / MEIA_VIDA_DIA_H)
+        cob = sum(math.log1p(x) for x in por_ala.values())
+        fatos = sum(1 for h in T["hist"] if any(m["ts"] >= corte for m in h))
+        leves = sum(1 for m in dia if _LEVE.search(norm(m["t"])))
+        temas = Counter(t for m in dia for t in m.get("tm", []))
+        principal = temas.most_common(1)[0][0] if temas else ""
+        fator = 0.45 if leves * 2 >= len(dia) else 1.0
+        if temas and set(temas) <= {"esp", "cul"}:
+            fator *= 0.8
+        nota = cob * (1 + 0.25 * math.log1p(fatos - 1)) * fator
+        cand.append({"T": T, "nota": nota, "tema": principal, "fontes": set(ultimo), "alas": set(por_ala), "ids": [T["id"]]})
+    cand.sort(key=lambda c: -c["nota"])
+    cand = cand[:300]
+    raras = lambda c: {w for w in c["T"]["cent"] if c["T"]["cent"][w] >= 0.15}
+    escolhidos, n_tema = [], Counter()
+    while cand and len(escolhidos) < N_PRINCIPAIS:
+        efetiva = lambda c: c["nota"] * max(0.75, 0.93 ** max(0, n_tema[c["tema"]] - 3))
+        c = max(cand, key=efetiva)
+        cand.remove(c)
+        # mesmo assunto que já foi escolhido (o agrupamento não juntou): vira parte dele
+        def parente(e):
+            cs = _cos(c["T"]["cent"], e["T"]["cent"])
+            n = _distintas(raras(c) & raras(e), c["T"]["viz"] | e["T"]["viz"])
+            return (cs >= 0.24 and n >= 1) or (cs >= 0.18 and n >= 2)
+        dono = next((e for e in escolhidos if parente(e)), None)
+        if dono:
+            if "--juntou" in sys.argv:
+                print("juntou:", _titulo(c["T"]), "  ->  ", _titulo(dono["T"]))
+            dono["ids"] += c["ids"]
+            dono["fontes"] |= c["fontes"]
+            dono["alas"] |= c["alas"]
+            continue
+        escolhidos.append(c)
+        n_tema[c["tema"]] += 1
+    por_id = {T["id"]: T for T in tops}
+    rep = lambda c: manchete([m for a in c["ids"] for h in por_id[a]["hist"] for m in h if m["ts"] >= corte], agora)["u"]
+    return [{"a": c["ids"], "nota": round(c["nota"], 2), "nf": len(c["fontes"]), "na": len(c["alas"] - {""}), "u": rep(c)}
+            for c in escolhidos]
+
+
+def _titulo(T):
+    return max(T["hist"], key=len)[0]["t"][:70]
+
+
+def manchete(membros, agora):
+    """A notícia que representa o assunto: do fato com mais veículos (pesando o horário: meia-vida 12 h) e mais
+    central (títulos parecidos com os dos outros fatos: evita pôr na frente um fato da beirada do assunto);
+    dentro dele, evita título de serviço ("AO VIVO", "Resumão") e prefere a que tem foto."""
+    fatos = defaultdict(list)
+    for m in membros:
+        fatos[m["g"] or m["u"]].append(m)
+    pal = {id(m): set(_palavras(m["t"])) for m in membros}
+    freq = Counter(w for m in membros for w in pal[id(m)])
+
+    def central(f):  # em média, quantos dos outros títulos do assunto têm as palavras deste fato
+        ws = set().union(*(pal[id(m)] for m in f))
+        fora = len(membros) - len(f)
+        if not fora or not ws:
+            return 1.0
+        return sum((freq[w] - sum(1 for m in f if w in pal[id(m)])) / fora for w in ws) / len(ws)
+    peso = lambda f: len({m["f"] for m in f}) * 0.5 ** (max(0, agora - max(m["ts"] for m in f)) / 3600 / 12) * (0.3 + central(f))
+    fato = max(fatos.values(), key=peso)
+    return max(fato, key=lambda m: (not _LEVE.search(norm(m["t"])), bool(m["im"]), m["ts"]))
 
 
 # ---------- vídeos (YouTube, pelo feed público de cada canal) ----------
@@ -491,20 +654,24 @@ def coletar():
     for i in itens:
         i["tm"], i["rg"], i["p"] = classificar(i["t"], i["r"], i["u"], i.get("c", ""), por_id[i["f"]])
     agrupar(itens, agora)
-    assuntos(itens, agora)
-    return saude, itens, agora
+    princ = principais(assuntos(itens, agora), saude, agora, itens)
+    return saude, itens, agora, princ
 
 
-def gravar(saude, itens, agora):
+def gravar(saude, itens, agora, princ):
     idx = {f["id"]: n for n, f in enumerate(saude)}
     fonte = {f["id"]: f for f in saude}
     corte = agora - RECENTE_H * 3600
     comum = {"gerado": agora, "fontes": saude, "paises": [p["nome"] for p in PAISES],
              "temas": {k: v[0] for k, v in TEMAS.items()}}
+    # principais do dia, já sem repetição: [[ids de assunto], nota, nº de veículos, nº de linhas, link da manchete];
+    # o app monta os cartões com as notícias que têm esses assuntos
+    lista_p = [[p["a"], p["nota"], p["nf"], p["na"], p["u"]] for p in princ]
     linha = lambda i: [i["t"], i["u"], i["ts"], idx[i["f"]], i["r"], " ".join(i["tm"] + [i["rg"]]), i["p"], i["g"], i["im"], i["a"]]
     for nome, parte in (("recentes.json", [i for i in itens if i["ts"] >= corte]),
                         ("antigas.json", [i for i in itens if i["ts"] < corte])):
-        (SITE / nome).write_text(json.dumps(dict(comum, itens=[linha(i) for i in parte]), ensure_ascii=False,
+        extra = {"principais": lista_p} if nome == "recentes.json" else {}
+        (SITE / nome).write_text(json.dumps(dict(comum, **extra, itens=[linha(i) for i in parte]), ensure_ascii=False,
                                             separators=(",", ":")), encoding="utf-8")
     # alertas: o celular baixa isto a cada ~30 min; cada notícia já vem com o tamanho do grupo dela
     fontes_g, alas_g = defaultdict(set), defaultdict(set)
@@ -516,19 +683,19 @@ def gravar(saude, itens, agora):
                 "nf": len(fontes_g[i["g"]]) if i["g"] else 1, "na": len(alas_g[i["g"]]) if i["g"] else 1,
                 "tm": i["tm"] + [i["rg"]]}
                for i in itens if i["ts"] >= agora - ALERTA_H * 3600]
-    def nota(i):
-        cob = 1 + 1.6 * math.log(len(fontes_g[i["g"]])) + 0.35 * (len(alas_g[i["g"]]) - 1) if i["g"] else 1
-        return cob * 0.5 ** (max(0, agora - i["ts"]) / 3600 / 8)
-    vistos, destaque = set(), []
-    for i in sorted((i for i in itens if i["ts"] >= agora - 24 * 3600), key=lambda i: (-nota(i), -bool(i["im"]))):
-        chave = ("a", i["a"]) if i["a"] else ("g", i["g"]) if i["g"] else ("u", i["u"])
-        if chave in vistos:
+    # widget: a manchete de cada um dos principais (o fato mais coberto do assunto, de preferência recente e com foto)
+    por_a = defaultdict(list)
+    for i in itens:
+        if i["a"] and i["ts"] >= agora - DIA_H * 3600:
+            por_a[i["a"]].append(i)
+    destaque = []
+    for p in princ[:25]:
+        membros = [i for a in p["a"] for i in por_a[a]]
+        if not membros:
             continue
-        vistos.add(chave)
-        destaque.append({"t": i["t"], "u": i["u"], "ts": i["ts"], "f": fonte[i["f"]]["nome"], "ala": fonte[i["f"]]["ala"],
-                         "nf": len(fontes_g[i["g"]]) if i["g"] else 1})
-        if len(destaque) == 25:
-            break
+        i = next((m for m in membros if m["u"] == p["u"]), None) or manchete(membros, agora)
+        destaque.append({"t": i["t"], "u": i["u"], "ts": max(m["ts"] for m in membros), "f": fonte[i["f"]]["nome"],
+                         "ala": fonte[i["f"]]["ala"], "nf": p["nf"]})
     (SITE / "widget.json").write_text(json.dumps({"gerado": agora, "itens": destaque}, ensure_ascii=False,
                                                  separators=(",", ":")), encoding="utf-8")
     (SITE / "alertas.json").write_text(json.dumps({"gerado": agora, "itens": alertas}, ensure_ascii=False,
@@ -569,7 +736,7 @@ def coletar_locais(agora):
 
 if __name__ == "__main__":
     t0 = time.time()
-    saude, itens, agora = coletar()
+    saude, itens, agora, princ = coletar()
     for f in saude:
         print(f"{f['ala'][:4]:5} {f['n']:4}  {f['nome']}" + (f"   <- {f['erro']}" if f["n"] == 0 else ""))
     falhas = sum(1 for f in saude if f["n"] == 0)
@@ -595,9 +762,17 @@ if __name__ == "__main__":
                 if (x["g"] or x["u"]) not in vistos:
                     vistos.add(x["g"] or x["u"])
                     print(f"   {x['t'][:110]}")
+    if "--principais" in sys.argv:
+        por_a = defaultdict(list)
+        for i in itens:
+            if i["a"] and i["ts"] >= agora - DIA_H * 3600:
+                por_a[i["a"]].append(i)
+        for k, p in enumerate(princ):
+            ms = [i for a in p["a"] for i in por_a[a]]
+            print(f"{k + 1:2}. {p['nota']:5.2f}  {p['nf']:2} veículos, {p['na']} linhas  {next(i['t'] for i in ms if i['u'] == p['u'])[:90]}")
     if "--testar" not in sys.argv:
         SITE.mkdir(exist_ok=True)
-        gravar(saude, itens, agora)
+        gravar(saude, itens, agora, princ)
         print(f"{coletar_locais(agora)} notícias locais")
         print("%d vídeos de %d canais" % coletar_videos(agora))
         print(f"{coletar_regiao(agora)} itens da região (Radar do Vale)")

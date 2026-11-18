@@ -1,7 +1,7 @@
 """Testes rápidos dos leitores (sem internet): python test_coletor.py"""
 import json
 from datetime import datetime, timezone
-from coletor import parse_feed, parse_desc, parse_wp, parse_ofuturo, parse_news, parse_embutido, classificar, agrupar
+from coletor import parse_feed, parse_desc, parse_wp, parse_ofuturo, parse_news, parse_embutido, classificar, agrupar, assuntos, principais
 
 rss = b"""<rss><channel><item><title>A &amp; B</title><link>https://x.org/1</link>
 <pubDate>Wed, 18 Nov 2026 11:38:26 -0300</pubDate><description>&lt;p&gt;Resumo&lt;/p&gt; The post A apareceu</description></item>
@@ -60,4 +60,24 @@ its = [{"t": t, "ts": agora - k * 600, "f": f} for k, (t, f) in enumerate([
 agrupar(its, agora)
 assert its[0]["g"] and its[0]["g"] == its[1]["g"] == its[2]["g"], [i["g"] for i in its[:5]]
 assert not its[3]["g"] or its[3]["g"] != its[4]["g"]
+
+# assuntos e principais: fatos diferentes do mesmo assunto viram um item; o dia inteiro conta
+alas = {"a": "radical", "b": "moderada", "c": "burguesa", "d": "direita", "e": "burguesa", "f": "burguesa", "g": "burguesa",
+        "h": "burguesa", "z": "burguesa"}
+fontes = [{"id": k, "ala": v} for k, v in alas.items()]
+H = 3600
+def it(t, f, h, r=""):
+    return {"t": t, "u": f"https://{f}.com/{abs(hash(t))}", "ts": agora - int(h * H), "f": f, "r": r, "im": "", "tm": ["pol"]}
+its = [it("Andrei entrega a Fachin relatório da PF sobre ministros no caso Master", f, 14 + k) for k, f in enumerate("abcd")]
+its += [it("Andrei vai ao Senado explicar troca de delegados no caso Master", f, 2) for f in "bc"]
+its += [it("Cantor famoso lança álbum surpresa com participação de rapper", f, 0.5) for f in "efgh"]  # 4 da mesma linha, agora
+its += [it(f"Notícia avulsa número {w}", "z", 1) for w in "alfa beta gama delta epsilon zeta eta teta".split()]
+its.sort(key=lambda i: -i["ts"])
+agrupar(its, agora)
+pr = principais(assuntos(its, agora), fontes, agora, its)
+master = {i["a"] for i in its if "Master" in i["t"]}
+assert len(master) == 1 or any(set(p["a"]) >= master for p in pr), master  # um assunto só
+assert set(pr[0]["a"]) & master, pr[0]  # 4 linhas há 14 h > 1 linha agora
+assert pr[0]["nf"] == 4 and pr[0]["na"] == 4, pr[0]
+assert sum(1 for p in pr if set(p["a"]) & master) == 1  # não repete
 print("ok")

@@ -42,13 +42,15 @@ NO CELULAR (APK)
 - Tela dividida e janela flutuante sem recarregar.
 
 RELEVÂNCIA (não há como saber os acessos dos outros sites, então é medida assim)
-- Cobertura: quantos veículos deram o mesmo fato (o coletor junta títulos com palavras raras em comum).
-- Espectro: fato coberto por várias linhas editoriais pesa mais.
-- Frescor: a nota cai pela metade a cada 8 h.
-- Você: jornais e temas que você mais abre e os que segue sobem (fica só no aparelho).
-- Sem repetição: fatos diferentes do mesmo assunto (ex.: Fachin e Alcolumbre sobre a dosimetria) viram um item só,
-  com os outros recolhidos embaixo. O coletor marca o assunto; o app ainda junta títulos com 2 palavras raras
-  em comum, sendo pelo menos uma nome próprio.
+- Principais do dia (coletor.py, funções assuntos e principais): os assuntos mais cobertos nas últimas 24 h.
+  Cada veículo conta uma vez por assunto, pesando o horário da notícia dele (meia-vida 18 h: o dia inteiro conta).
+- Espectro: soma por linha editorial (log de cada linha); assunto coberto por todas as linhas passa à frente
+  de um coberto por muitos jornais de uma linha só. Jornal que publica pouco pesa um pouco mais.
+- Assunto: fatos diferentes sobre a mesma coisa viram um item só (TF-IDF dos títulos e resumos, comparando com
+  o centro do assunto). Na escolha, assunto parecido com um já escolhido vira parte dele: não se repete.
+- Menos peso: serviço/entretenimento ("onde assistir", ao vivo, loterias, novela) e só esporte/cultura.
+- Para você: jornais e temas que você mais abre e os que segue sobem (fica só no aparelho).
+- Conferir com dados reais:  python coletor.py --testar --principais
 
 COLETA (GitHub Actions, de hora em hora; não precisa do PC)
 - coletor.py lê fontes.json e grava em site/: recentes.json (72 h), antigas.json (até 30 dias),

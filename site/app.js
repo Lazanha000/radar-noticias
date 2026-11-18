@@ -57,7 +57,7 @@ function baixarTexto(url) {
 }
 
 // ---------- dados ----------
-const D = {itens: [], fontes: {}, lista: [], paises: [], temas: {}, gerado: 0, antigas: false, grupos: new Map(), locais: null, videos: null};
+const D = {itens: [], fontes: {}, lista: [], paises: [], temas: {}, gerado: 0, antigas: false, grupos: new Map(), locais: null, videos: null, principais: null};
 let carregandoAntigas = null, ultimoRecentes = null;
 
 function novoItem(t, u, ts, f, r, tm, rg, p, g, im, a) {
@@ -66,6 +66,7 @@ function novoItem(t, u, ts, f, r, tm, rg, p, g, im, a) {
 function juntar(d, limpar) {
   if (limpar) { D.itens = []; D.fontes = {}; D.lista = []; }
   D.paises = d.paises; D.temas = d.temas; D.gerado = Math.max(D.gerado, d.gerado);
+  if (d.principais) D.principais = d.principais;
   for (const f of d.fontes) if (!D.fontes[f.id]) { D.fontes[f.id] = f; D.lista.push(f); }
   const vistos = new Set(D.itens.map(i => i.u));
   for (const [t, u, ts, fi, r, tm, p, g, im, a] of d.itens) {
@@ -253,6 +254,33 @@ function assuntos(hs) {
 }
 const chavesDe = T => [T.h, ...T.rel].flatMap(h => h.itens.map(i => i.u));
 
+/** Principais do dia, como o coletor escolheu (assuntos mais cobertos nas últimas 24 h, pesando quantos veículos
+ *  e de quantas linhas editoriais; um assunto por item). Aqui só monta os cartões e tira os jornais ocultos.
+ *  Na frente vai a manchete que o coletor indicou; embaixo, os outros fatos do assunto, dos mais cobertos. */
+function principaisDoDia() {
+  if (!D.principais) return null;
+  const porA = new Map();
+  for (const i of visiveis()) if (i.a) { let l = porA.get(i.a); if (!l) porA.set(i.a, l = []); l.push(i); }
+  const out = [];
+  for (const [ids, nota, nf, na, u] of D.principais) {
+    const its = ids.flatMap(a => porA.get(a) || []);
+    if (!its.length) continue;
+    const hs = historias(its).sort((a, b) => (b.grupo?.fontes.size || 1) - (a.grupo?.fontes.size || 1) || Math.max(...b.itens.map(i => i.ts)) - Math.max(...a.itens.map(i => i.ts)));
+    const k = Math.max(0, hs.findIndex(h => h.itens.some(i => i.u === u)));
+    const h = hs[k];
+    const escolhida = h.itens.find(i => i.u === u);
+    if (escolhida) h.rep = escolhida;
+    out.push({h, rel: hs.filter((_, j) => j !== k), nf, na, nota, ids, itens: its});
+  }
+  return out;
+}
+// "22 veículos no assunto" (quando o assunto tem mais veículos que o fato da manchete)
+function totalAssunto(T) {
+  const g = grupoDe(T.h.rep), nfFato = g ? g.fontes.size : 1;
+  if (!T.nf || T.nf <= nfFato) return "";
+  return `<span class="ass-total" title="Veículos que deram algum fato deste assunto">${espectro({itens: T.itens})}${T.nf} veículos no assunto</span>`;
+}
+
 // ---------- filtros ----------
 function termos(q) {
   const ts = [];
@@ -311,7 +339,7 @@ function relacionadas(T, mostrar = 0) {
     + (resto.length ? `<button class="abre-relac" aria-expanded="false">${ic("seta")}${mostrar ? "Mais" : ""} ${resto.length} ${resto.length === 1 ? "notícia" : "notícias"} sobre este assunto</button><ul hidden>${resto.map(linha).join("")}</ul>` : "")
     + `</div>`;
 }
-const cartaoAssunto = (T, opts = {}) => cartaoNoticia(T.h.rep, opts).replace(/<\/article>$/, relacionadas(T, opts.mostrar || 0) + "</article>");
+const cartaoAssunto = (T, opts = {}) => cartaoNoticia(T.h.rep, opts).replace(/<\/article>$/, ((t => t ? `<div class="meta">${t}</div>` : "")(totalAssunto(T))) + relacionadas(T, opts.mostrar || 0) + "</article>");
 
 // lista com rolagem infinita
 function lista(el, itens, opts = {}) {
@@ -362,17 +390,33 @@ function vInicio() {
   rolaAte($(".trilho [aria-pressed=true]"));
   clima();
   if (secao === "destaques") return destaques();
+  if (secao === "manchetes" && D.principais && !manchetesComFiltros) return manchetes();
   const base = secao === "manchetes" ? {minFontes: 3, periodo: 48} : secao.length === 1 ? {regiao: secao} : {temas: [secao]};
   feed($("#corpo"), novoFiltro(base));
+}
+
+// Manchetes: todos os principais do dia (até 40), na ordem do coletor; "Filtrar" volta à lista com filtros
+let manchetesComFiltros = false;
+function manchetes() {
+  const c = $("#corpo"), princ = principaisDoDia() || [];
+  c.innerHTML = `<div class="ferr"><span class="cont">${princ.length} assuntos das últimas 24 h, dos mais cobertos para os menos</span>`
+    + `<button class="btn" data-filtrar>${ic("filtro")}Filtrar</button></div><div class="lista"></div>`;
+  lista(c.querySelector(".lista"), princ, {desenha: T => cartaoAssunto(T, {resumo: true}), vazio: "Ainda não há principais do dia."});
+  c.querySelector("[data-filtrar]").onclick = () => { manchetesComFiltros = true; vInicio(); manchetesComFiltros = false; };
 }
 
 function destaques() {
   const c = $("#corpo");
   const base = visiveis();
-  const dia = base.filter(i => i.ts >= agora() - 24 * H);
-  const ass = assuntos(historias(dia.length > 60 ? dia : base.filter(i => i.ts >= agora() - 48 * H)));
-  const princ = ass.slice(0, 6);
-  const usados = new Set(princ.flatMap(chavesDe)), assUsados = new Set(princ.flatMap(T => [T.h, ...T.rel].map(h => h.a).filter(Boolean)));
+  // principais: a lista do coletor (dia inteiro, sem repetir assunto); dados antigos sem ela: o cálculo de antes
+  let princ = principaisDoDia();
+  if (!princ || !princ.length) {
+    const dia = base.filter(i => i.ts >= agora() - 24 * H);
+    princ = assuntos(historias(dia.length > 60 ? dia : base.filter(i => i.ts >= agora() - 48 * H)));
+  }
+  princ = princ.slice(0, 8);
+  const usados = new Set(princ.flatMap(T => T.itens ? T.itens.map(i => i.u) : chavesDe(T)));
+  const assUsados = new Set(princ.flatMap(T => T.ids || [T.h, ...T.rel].map(h => h.a).filter(Boolean)));
   const livre = T => ![T.h, ...T.rel].some(h => (h.a && assUsados.has(h.a)) || h.itens.some(i => usados.has(i.u)));
   const marca = T => { chavesDe(T).forEach(u => usados.add(u)); [T.h, ...T.rel].forEach(h => h.a && assUsados.add(h.a)); };
   c.innerHTML = `<div class="grade"><div class="principal"></div><div class="lateral"></div></div>`;
@@ -381,14 +425,12 @@ function destaques() {
   if (blocoLigado("principais") && princ.length) {
     const lider = princ[0], hl = lider.h;
     const rep = hl.itens.find(i => i.im && i === hl.rep) || hl.itens.find(i => i.im) || hl.rep;
-    const outros = [], alasVistas = new Set([rep.f.ala]);
-    for (const i of hl.itens) if (i !== rep && !alasVistas.has(i.f.ala) && outros.length < 3) { outros.push(i); alasVistas.add(i.f.ala); }
-    for (const i of hl.itens) if (i !== rep && !outros.includes(i) && outros.length < 3) outros.push(i);
+    // sem repetir o mesmo fato em outros jornais (estão em "N veículos"): embaixo vão fatos DIFERENTES do assunto
     let html = `<div class="lider">${rep.im ? `<img class="foto" src="${esc(rep.im)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}`
-      + cartaoNoticia(rep, {thumb: false, grande: true}).replace(/<\/article>$/, relacionadas(lider, 2) + "</article>")
-      + `<div class="outros">${outros.map(i => cartaoNoticia(i, {thumb: false})).join("")}</div></div>`;
+      + cartaoNoticia(rep, {thumb: false, grande: true}).replace(/<\/article>$/, ((t => t ? `<div class="meta">${t}</div>` : "")(lider.nf ? totalAssunto(lider) : "")) + relacionadas(lider, 3) + "</article>")
+      + `</div>`;
     html += princ.slice(1).map(T => cartaoAssunto(T)).join("");
-    P.insertAdjacentHTML("beforeend", `<section class="bloco b-principais"><h2>Principais notícias <button data-ir="manchetes">Ver todas ${ic("seta")}</button></h2>${html}</section>`);
+    P.insertAdjacentHTML("beforeend", `<section class="bloco b-principais"><h2>Principais do dia <button data-ir="manchetes">Ver todas ${ic("seta")}</button></h2>${html}</section>`);
     P.querySelector("[data-ir]").onclick = () => { secao = "manchetes"; guarda("secao", secao); vInicio(); };
   }
 
@@ -1173,11 +1215,11 @@ function vAlertas(parte) {
     + `</section>`
     + `<section class="grupo"><details class="sobre"><summary>Como a relevância é medida</summary>`
     + `<p>Não dá para saber quantas pessoas leram cada notícia nos outros sites. Então o Radar mede assim:</p><ul>`
-    + `<li><b>Cobertura:</b> quantos veículos diferentes deram o mesmo fato. O coletor junta títulos que falam da mesma coisa (palavras raras em comum).</li>`
-    + `<li><b>Espectro:</b> se o fato aparece em várias linhas editoriais (esquerda, imprensa burguesa, direita), pesa mais.</li>`
-    + `<li><b>Frescor:</b> a nota cai pela metade a cada 8 horas.</li>`
-    + `<li><b>Você:</b> jornais e temas que você mais abre, e os que segue, sobem. Isso fica só neste aparelho.</li>`
-    + `<li><b>Sem repetição:</b> fatos diferentes do mesmo assunto (ex.: "Fachin diz que o STF julga a dosimetria" e "Alcolumbre pede a Moraes o julgamento") aparecem juntos, num item só.</li>`
+    + `<li><b>Principais do dia:</b> os assuntos que mais veículos cobriram nas últimas 24 h, não só nas últimas horas. Uma notícia de 18 h atrás vale metade de uma de agora.</li>`
+    + `<li><b>Cobertura e espectro:</b> soma os veículos de cada linha editorial e dá mais peso a quem cobriu todo o espectro do que a muitos jornais de uma linha só. Jornal que publica pouco pesa um pouco mais (escolheu cobrir).</li>`
+    + `<li><b>Assunto, não só fato:</b> o coletor junta fatos diferentes do mesmo assunto (ex.: "PF entrega relatório a Fachin" e "Andrei vai ao Senado" no caso Master) num item só, com os outros fatos recolhidos embaixo. Assunto que se desenrola em vários fatos sobe.</li>`
+    + `<li><b>Menos peso:</b> "onde assistir", ao vivo, loterias, novela e assunto só de esporte ou cultura.</li>`
+    + `<li><b>Você:</b> em "Para você", jornais e temas que você mais abre, e os que segue, sobem. Isso fica só neste aparelho. Os principais são iguais para todos (menos os jornais que você ocultou).</li>`
     + `<li><b>Vídeos:</b> visualizações divididas pelo tempo desde a publicação.</li></ul>`
     + `<p>Coleta de hora em hora. Última: ${new Date(D.gerado * 1000).toLocaleString("pt-BR", {dateStyle: "short", timeStyle: "short"})}.${versaoApp ? " App versão " + esc(versaoApp) + "." : ""}</p></details></section>`
     + `</form>`;
