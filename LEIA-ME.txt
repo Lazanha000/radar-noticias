@@ -25,6 +25,13 @@ ABAS
   O feed do YouTube só traz os 15 últimos vídeos; o coletor acumula a cada hora (até 40 por canal).
   Não há duração nem busca no arquivo antigo dos canais (isso o Garimpo faz pelo PC).
   Para incluir canal para todos: canais.json + python scripts/icones.py + git push.
+- Leitura dentro do Radar: Alertas e ajustes > Leitura > "Ler dentro do Radar" (ligado por padrão no app do celular).
+  Tocar numa notícia abre uma tela limpa (extrator Readability, site/leitor/), com letra A-/A+ e botão para o original.
+  No app o aparelho baixa a página pela ponte e funciona na maioria dos sites. No navegador do PC o CORS bloqueia quase
+  todos: aparece o aviso e o botão do original. Ctrl/Shift+clique abre o original. Sites com assinatura ou texto por script falham.
+- Curadoria com IA (#curadoria, atalho no Início): monta um arquivo .md com as notícias das linhas escolhidas (padrão: esquerda
+  radical + moderada, 24 h), agrupadas por fato e com a cobertura no espectro inteiro, mais o pedido pronto: 5 obrigatórias e
+  10 opcionais (configuráveis), com seus critérios. Copiar tudo (app e PC) ou Baixar .md (só PC). Depois cola ou anexa numa IA.
 - Sites e cidades próprios: Banca > Adicionar site (acha o feed sozinho); Ajustes > Cidades.
   Ficam só no aparelho e são lidos por ele (no app Android sempre funciona; no navegador do PC, só se o site permitir).
 - Ocultar jornal (página do jornal), escolher os blocos do Início, cor das coleções.

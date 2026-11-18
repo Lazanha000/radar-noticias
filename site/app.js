@@ -18,7 +18,7 @@ const app = window.RadarApp;  // ponte com o app Android (não existe no navegad
 const le = (k, pad) => { try { const v = localStorage.getItem("radar2." + k); return v === null ? pad : JSON.parse(v); } catch (e) { return pad; } };
 const guarda = (k, v) => { try { localStorage.setItem("radar2." + k, JSON.stringify(v)); } catch (e) {} };
 const BLOCOS = [["principais", "Principais notícias"], ["locais", "Notícias locais"], ["voce", "Para você"], ["videos", "Vídeos em alta"], ["espectro", "Pelo espectro"], ["recentes", "Mais recentes"]];
-const cfg = Object.assign({tema: "sistema", fs: 16, auto: true, autoMin: 15, cidade: "Araçuaí", blocos: {}}, le("cfg", {}));
+const cfg = Object.assign({tema: "sistema", fs: 16, auto: true, autoMin: 15, cidade: "Araçuaí", blocos: {}, leitor: !!window.RadarApp}, le("cfg", {}));
 const cliques = le("cliques", {}), cliquesTema = le("cliquesTema", {});
 let seguindo = new Set(le("seguindo", []));
 let ocultos = new Set(le("ocultos", []));
@@ -340,9 +340,10 @@ function render() {
   for (const a of document.querySelectorAll("[data-v]")) { if (a.dataset.v === v) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); }
   const mudou = vistaAtual !== location.hash;
   vistaAtual = location.hash;
+  if (v === "curadoria" && !mudou && $("#cur")) return;  // não apaga o que você está editando quando chegam notícias novas
   if (!D.itens.length) { $("#vista").innerHTML = `<div class="vazio">Carregando notícias…</div>`; return; }
   ({inicio: vInicio, colecoes: vColecoes, colecao: vColecao, banca: vBanca, fonte: vFonte, alertas: vAlertas,
-    busca: vBusca, historia: vHistoria, videos: vVideos, regiao: vRegiao}[v] || vInicio)(arg);
+    busca: vBusca, historia: vHistoria, videos: vVideos, regiao: vRegiao, curadoria: vCuradoria}[v] || vInicio)(arg);
   if (mudou) window.scrollTo(0, 0);
 }
 
@@ -356,6 +357,7 @@ function cabecalho(titulo, sub = "", extra = "") {
 function vInicio() {
   const hoje = new Date().toLocaleDateString("pt-BR", {weekday: "long", day: "numeric", month: "long"});
   $("#vista").innerHTML = cabecalho("Suas notícias", hoje, `<a class="clima" id="clima" href="#alertas" hidden></a>`)
+    + `<a class="atalho-cur" href="#curadoria">${ic("filtro")}<span><b>Curadoria do dia com IA</b><small>Monte um arquivo com as notícias da esquerda e peça 5 obrigatórias e 10 opcionais.</small></span>${ic("seta")}</a>`
     + `<nav class="trilho" aria-label="Seções">${SECOES().map(([k, n]) => `<button data-s="${k}" aria-pressed="${k === secao}">${esc(n)}</button>`).join("")}</nav>`
     + `<div id="corpo"></div>`;
   $(".trilho").onclick = e => { const b = e.target.closest("button"); if (!b) return; if (b.dataset.s === "regiao") { location.hash = "#regiao"; return; } secao = b.dataset.s; guarda("secao", secao); vInicio(); };
@@ -1160,6 +1162,10 @@ function vAlertas(parte) {
     + `<p style="color:var(--tx2);font-size:.82rem;margin:10px 0 4px">Os que mais leio agora:</p><div class="top-lidos">${top.length ? top.map(id => `<span>${icone(D.fontes[id])}${esc(D.fontes[id].nome)}</span>`).join("") : `<span style="background:none;padding:0;font-weight:400;color:var(--tx2)">ainda nenhum (abra algumas notícias)</span>`}</div>`
     + `<details class="sobre"><summary>Marcar jornais (${alertas.escolhidos.length})</summary>${marcarFontes(alertas.escolhidos, "escolhido")}</details>`
     + `</section>`
+    + `<section class="grupo"><h2>Leitura</h2>`
+    + `<label class="op"><span class="t"><b>Ler dentro do Radar</b><span>Abre a notícia numa tela de leitura limpa, sem sair daqui. ${app ? "" : "No navegador, a maioria dos sites bloqueia isso; o app do celular não tem esse limite."} Se não der, abre o site original.</span></span><input type="checkbox" class="chave" name="leitor" ${cfg.leitor ? "checked" : ""}></label>`
+    + `<div class="op"><span class="t"><b>Curadoria com IA</b><span>Gera um arquivo grande com as notícias da esquerda para uma IA escolher o que ler.</span></span><a class="btn" href="#curadoria">Abrir</a></div>`
+    + `</section>`
     + `<section class="grupo"><h2>Temas</h2><p>Só avisa sobre estes assuntos.</p><div class="opcoes" style="padding-bottom:14px">${Object.entries(D.temas).map(([k, n]) => `<label><input type="checkbox" name="tema" value="${k}" ${temas.includes(k) ? "checked" : ""}>${esc(n)}</label>`).join("")}</div></section>`
     + `<section class="grupo"><h2>Início</h2><p>Blocos que aparecem em Destaques.</p>${BLOCOS.map(([k, n]) => `<label class="op"><span class="t"><b>${n}</b></span><input type="checkbox" class="chave" name="bloco" value="${k}" ${blocoLigado(k) ? "checked" : ""}></label>`).join("")}</section>`
     + `<section class="grupo" id="cidades"><h2>Cidades</h2><p>Notícias locais e clima. ${app ? "" : "Cidades novas são buscadas pelo app do celular."}</p>`
@@ -1191,7 +1197,7 @@ function vAlertas(parte) {
       silencio: fd.has("silencio"), de: +fd.get("de"), ate: +fd.get("ate"), nivel: fd.get("nivel"), modo: fd.get("modo"),
       escolhidos: fd.getAll("escolhido"), temas: fd.getAll("tema").length === Object.keys(D.temas).length ? null : fd.getAll("tema")});
     const ligados = new Set(fd.getAll("bloco"));
-    Object.assign(cfg, {tema: fd.get("tema_cor"), fs: +fd.get("fs"), auto: fd.has("auto"), autoMin: +fd.get("autoMin"), cidade: fd.get("cidade") || cfg.cidade,
+    Object.assign(cfg, {tema: fd.get("tema_cor"), fs: +fd.get("fs"), auto: fd.has("auto"), autoMin: +fd.get("autoMin"), cidade: fd.get("cidade") || cfg.cidade, leitor: fd.has("leitor"),
       blocos: Object.fromEntries(BLOCOS.map(([k]) => [k, ligados.has(k)]))});
     $("#horas").hidden = !alertas.silencio; $("#autoMin").hidden = !cfg.auto;
     form.querySelector("details summary").textContent = `Marcar jornais (${alertas.escolhidos.length})`;
@@ -1224,6 +1230,178 @@ async function adicionarCidade() {
   } catch (e) { est.textContent = "Sem conexão para procurar a cidade."; }
 }
 
+// ---------- leitor dentro do Radar ----------
+const leitorCache = new Map();
+let leitorSeq = 0, leitorPronto = null;
+const carregarReadability = () => leitorPronto || (leitorPronto = new Promise((res, rej) => {
+  if (window.Readability) return res();
+  const t = document.createElement("script"); t.src = "leitor/Readability.js?v=1"; t.onload = res; t.onerror = () => { leitorPronto = null; rej(new Error("leitor indisponível")); };
+  document.head.append(t);
+}));
+// o HTML vem de site de terceiros: só estas tags e atributos passam (nada de script, evento ou estilo)
+const TAGS_OK = new Set("p h1 h2 h3 h4 h5 h6 blockquote ul ol li strong b em i u s br hr a img figure figcaption pre code table thead tbody tr th td sup sub cite q small".split(" "));
+function limparHtml(html, base) {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const url = v => { try { const u = new URL(v, base); return /^https?:$/.test(u.protocol) ? u.href : ""; } catch (e) { return ""; } };
+  const novo = document.createElement("div");
+  (function copia(de, para) {
+    for (const n of [...de.childNodes]) {
+      if (n.nodeType === 3) { para.append(document.createTextNode(n.textContent)); continue; }
+      if (n.nodeType !== 1) continue;
+      const tag = n.tagName.toLowerCase();
+      if (!TAGS_OK.has(tag)) { if (!/^(script|style|iframe|object|embed|form|button|input|select|textarea|svg|video|audio|noscript|template)$/.test(tag)) copia(n, para); continue; }
+      const el = document.createElement(tag);
+      if (tag === "a") { const h = url(n.getAttribute("href") || ""); if (h) { el.href = h; el.target = "_blank"; el.rel = "noopener noreferrer"; } }
+      if (tag === "img") { const s = url(n.getAttribute("src") || ""); if (!s) continue; el.src = s; el.alt = n.getAttribute("alt") || ""; el.loading = "lazy"; el.referrerPolicy = "no-referrer"; }
+      copia(n, el); para.append(el);
+    }
+  })(doc.body, novo);
+  return novo;
+}
+async function lerArtigo(url) {
+  if (leitorCache.has(url)) return leitorCache.get(url);
+  const [html] = await Promise.all([baixarTexto(url), carregarReadability()]);
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const base = doc.createElement("base"); base.href = url; doc.head.prepend(base);
+  const r = new Readability(doc, {charThreshold: 300}).parse();
+  if (!r || !r.content || (r.textContent || "").trim().length < 400) throw new Error("sem texto");
+  const conteudo = limparHtml(r.content, url);
+  const h = conteudo.firstElementChild;  // o título já aparece no topo da tela
+  if (h && /^H[1-3]$/.test(h.tagName) && norm(r.title || "").includes(norm(h.textContent).trim().slice(0, 30))) h.remove();
+  const a = {titulo: r.title, autor: r.byline, conteudo, palavras: r.textContent.trim().split(/\s+/).length};
+  leitorCache.set(url, a);
+  return a;
+}
+function fecharLeitor(voltar) {
+  const el = $("#leitor"); if (!el) return;
+  el.remove(); document.body.classList.remove("lendo");
+  if (voltar && history.state?.leitor) history.back();
+}
+async function abrirLeitor(url, titulo, fonte) {
+  fecharLeitor(false);
+  const eu = ++leitorSeq;
+  const el = document.createElement("div"); el.id = "leitor"; el.className = "leitor"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Leitura");
+  el.style.setProperty("--lfs", (le("leitorFs", 19)) + "px");
+  el.innerHTML = `<div class="l-barra"><button class="btn-i" data-l="voltar" aria-label="Fechar leitura">${ic("voltar")}</button><span class="l-fonte">${fonte ? icone(fonte) + esc(fonte.nome) : ""}</span>`
+    + `<button class="btn-i" data-l="menos" aria-label="Letra menor"><b style="font-size:.8rem">A</b></button><button class="btn-i" data-l="mais" aria-label="Letra maior"><b style="font-size:1.15rem">A</b></button>`
+    + `<a class="btn-i" href="${esc(url)}" target="_blank" rel="noopener" aria-label="Abrir no site original">${ic("externo")}</a></div>`
+    + `<article class="l-texto"><h1>${esc(titulo)}</h1><div class="l-corpo"><p class="l-estado">Carregando a notícia…</p></div></article>`;
+  document.body.append(el); document.body.classList.add("lendo");
+  history.pushState({leitor: 1}, "", location.href);
+  el.onclick = e => {
+    const b = e.target.closest("[data-l]"); if (!b) return;
+    if (b.dataset.l === "voltar") return fecharLeitor(true);
+    const n = Math.max(14, Math.min(30, le("leitorFs", 19) + (b.dataset.l === "mais" ? 1 : -1)));
+    guarda("leitorFs", n); el.style.setProperty("--lfs", n + "px");
+  };
+  const corpo = el.querySelector(".l-corpo");
+  try {
+    const a = await lerArtigo(url);
+    if (eu !== leitorSeq || !el.isConnected) return;
+    corpo.replaceChildren(a.conteudo.cloneNode(true));
+    corpo.insertAdjacentHTML("beforebegin", `<div class="l-meta">${a.autor ? esc(a.autor) + " · " : ""}${Math.max(1, Math.round(a.palavras / 200))} min de leitura</div>`);
+    corpo.insertAdjacentHTML("afterend", `<p class="l-fim"><a class="btn" href="${esc(url)}" target="_blank" rel="noopener">${ic("externo")}Abrir no site original</a></p>`);
+    el.scrollTop = 0;
+  } catch (err) {
+    if (eu !== leitorSeq || !el.isConnected) return;
+    corpo.innerHTML = `<p class="l-estado">Não consegui trazer o texto para cá${app ? "" : " (no navegador, a maioria dos sites bloqueia a leitura de fora; o app do celular lê todos)"}. Pode ser também um site com assinatura ou que carrega o texto por script.</p>`
+      + `<p><a class="btn pri" href="${esc(url)}" target="_blank" rel="noopener">${ic("externo")}Abrir no site original</a></p>`;
+  }
+}
+window.addEventListener("popstate", () => { if ($("#leitor")) fecharLeitor(false); });
+
+// ---------- curadoria: arquivo para a IA escolher 5 obrigatórias e 10 opcionais ----------
+const CRITERIOS_PADRAO = "Priorize fatos que afetam a classe trabalhadora, a luta política e social, a economia e o mundo do trabalho, e as divergências entre a esquerda radical e a moderada. Evite repetir o mesmo fato e misture Brasil e mundo.";
+const cur = Object.assign({horas: 24, alas: ["radical", "moderada"], max: 400, resumo: true, criterios: CRITERIOS_PADRAO, obrig: 5, opc: 10}, le("cur", {}));
+const dataCur = ts => new Date(ts * 1000).toLocaleString("pt-BR", {day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"});
+function montarCuradoria() {
+  const alas = new Set(cur.alas), lim = agora() - cur.horas * H;
+  const itens = D.itens.filter(i => i.ts >= lim && alas.has(i.f.ala) && !ocultos.has(i.f.id));
+  const hs = [];
+  let total = 0;
+  for (const h of historias(itens)) { if (total >= cur.max) break; hs.push(h); total += h.itens.length; }
+  const nomes = ALAS.filter(([a]) => alas.has(a)).map(([, n]) => n.toLowerCase()).join(" e ");
+  let t = `# CURADORIA DE NOTÍCIAS PARA LEITURA DO DIA\n\n`
+    + `## Sua tarefa\n`
+    + `Você é um curador de notícias. Abaixo estão as notícias publicadas nas últimas ${cur.horas} horas por veículos de ${nomes}, `
+    + `agrupadas por fato (o mesmo fato aparece uma vez, com todos os veículos que o cobriram) e em ordem aproximada de relevância. `
+    + `Escolha, usando SÓ o que está neste arquivo:\n`
+    + `1. ${cur.obrig} notícias OBRIGATÓRIAS: as que a pessoa não pode deixar de ler hoje.\n`
+    + `2. ${cur.opc} notícias OPCIONAIS: boas para ler se houver tempo, de preferência de assuntos diferentes das obrigatórias.\n\n`
+    + `Critérios do leitor: ${cur.criterios.trim() || CRITERIOS_PADRAO}\n\n`
+    + `Formato da resposta, para cada escolha: o número do fato entre colchetes [n], o título, o veículo mais indicado para ler (com o link) e UMA frase dizendo por que vale a leitura. `
+    + `Ao final, em até 3 linhas, aponte divergências de enfoque entre os veículos nos fatos escolhidos, se houver. `
+    + `Não invente fatos nem links; se o arquivo não tiver ${cur.obrig + cur.opc} fatos bons, diga quantos escolheu. `
+    + `Cobertura em várias linhas editoriais indica que o fato é grande, mas não decide sozinha: um fato só da esquerda radical pode ser importante.\n\n`
+    + `## Dados\nGerado em ${dataCur(agora())} · ${hs.length} fatos · ${total} notícias · linhas: ${nomes} · período: ${cur.horas} h\n\n---\n\n`;
+  hs.forEach((h, n) => {
+    const todos = (h.grupo?.itens || h.itens), cont = {};
+    for (const i of todos) cont[i.f.ala] = (cont[i.f.ala] || 0) + 1;
+    const rep = h.rep;
+    t += `### [${n + 1}] ${rep.t}\n`
+      + `Cobertura total: ${new Set(todos.map(i => i.f.id)).size} veículos (${ALAS.filter(([a]) => cont[a]).map(([a, nm]) => `${cont[a]} ${nm.toLowerCase()}`).join(", ")})`
+      + (rep.tm.length ? ` · temas: ${rep.tm.map(c => D.temas[c] || c).join(", ")}` : "") + `\n`;
+    const vistos = new Set();
+    for (const i of [...h.itens].sort((a, b) => b.ts - a.ts)) {
+      if (vistos.has(i.u)) continue; vistos.add(i.u);
+      t += `- ${i.f.nome} (${NOME_ALA[i.f.ala].toLowerCase()}) · ${dataCur(i.ts)}${i === rep ? "" : ` · ${i.t}`}\n  ${i.u}\n`
+        + (cur.resumo && i.r ? `  Resumo: ${i.r}\n` : "");
+    }
+    t += `\n`;
+  });
+  return {texto: t, fatos: hs.length, itens: total};
+}
+function vCuradoria() {
+  const sel = (v, l, a) => `<option value="${v}" ${String(a) === String(v) ? "selected" : ""}>${l}</option>`;
+  $("#vista").innerHTML = `<button class="voltar" onclick="history.back()">${ic("voltar")}Voltar</button>` + cabecalho("Curadoria com IA", "Um arquivo com as notícias da esquerda para uma IA escolher o que ler hoje")
+    + `<form class="ajustes" id="cur" onsubmit="return false">`
+    + `<section class="grupo"><h2>O que entra no arquivo</h2>`
+    + `<div class="op"><span class="t"><b>Linhas editoriais</b></span><span class="opcoes" style="padding:0">${ALAS.map(([a, n]) => `<label><input type="checkbox" name="ala" value="${a}" ${cur.alas.includes(a) ? "checked" : ""}>${n}</label>`).join("")}</span></div>`
+    + `<label class="op"><span class="t"><b>Período</b></span><select name="horas">${[[12, "Últimas 12 h"], [24, "Últimas 24 h"], [48, "Últimas 48 h"], [72, "Últimas 72 h"]].map(([v, l]) => sel(v, l, cur.horas)).join("")}</select></label>`
+    + `<label class="op"><span class="t"><b>Tamanho</b><span>Máximo de notícias, das mais relevantes para as menos.</span></span><select name="max">${[[150, "Até 150"], [400, "Até 400"], [1000, "Até 1.000"], [5000, "Tudo"]].map(([v, l]) => sel(v, l, cur.max)).join("")}</select></label>`
+    + `<label class="op"><span class="t"><b>Incluir resumos</b><span>Ajuda a IA a entender, mas deixa o arquivo maior.</span></span><input type="checkbox" class="chave" name="resumo" ${cur.resumo ? "checked" : ""}></label>`
+    + `<label class="op"><span class="t"><b>Obrigatórias</b></span><select name="obrig">${[3, 5, 7, 10].map(n => sel(n, n, cur.obrig)).join("")}</select></label>`
+    + `<label class="op"><span class="t"><b>Opcionais</b></span><select name="opc">${[5, 10, 15, 20].map(n => sel(n, n, cur.opc)).join("")}</select></label>`
+    + `</section>`
+    + `<section class="grupo"><h2>Seus critérios</h2><p>Entram no pedido à IA. Diga o que importa para você.</p><textarea name="criterios" rows="4" class="cur-crit" aria-label="Critérios de escolha">${esc(cur.criterios)}</textarea></section>`
+    + `<section class="grupo"><h2>Arquivo</h2><p id="cur-info" aria-live="polite"></p>`
+    + `<div class="cur-acoes"><button type="button" class="btn pri" id="cur-copiar">${ic("externo")}Copiar tudo</button>${app ? "" : `<button type="button" class="btn" id="cur-baixar">Baixar .md</button>`}<button type="button" class="btn" id="cur-ver">Prévia</button></div>`
+    + `<p class="rodape" style="text-align:left">Depois é só colar (ou anexar) numa IA com bastante contexto, como o Claude, e enviar. O pedido já vem escrito no começo do arquivo. ${app ? "No app do celular só há a opção de copiar." : ""}</p>`
+    + `<textarea id="cur-previa" class="cur-previa" readonly hidden aria-label="Prévia do arquivo"></textarea></section></form>`;
+  const form = $("#cur");
+  let pronto;
+  const atualiza = () => {
+    pronto = montarCuradoria();
+    const kb = Math.round(pronto.texto.length / 1024), tok = Math.round(pronto.texto.length / 3.6 / 1000);
+    $("#cur-info").innerHTML = pronto.fatos ? `<b>${pronto.fatos}</b> fatos · <b>${pronto.itens}</b> notícias · ${kb} KB (cerca de ${tok} mil tokens)`
+      + (tok > 150 ? `<br><span style="color:var(--perigo)">Grande para algumas IAs. Reduza o tamanho ou o período se ela recusar.</span>` : "")
+      : `<span style="color:var(--perigo)">Nenhuma notícia com essas opções. Marque uma linha ou aumente o período.</span>`;
+    if (!$("#cur-previa").hidden) $("#cur-previa").value = pronto.texto;
+  };
+  form.onchange = form.oninput = e => {
+    const fd = new FormData(form);
+    Object.assign(cur, {alas: fd.getAll("ala"), horas: +fd.get("horas"), max: +fd.get("max"), resumo: fd.has("resumo"), obrig: +fd.get("obrig"), opc: +fd.get("opc"), criterios: fd.get("criterios")});
+    guarda("cur", cur);
+    if (e.type === "change" || e.target.name !== "criterios") atualiza();
+    else { clearTimeout(form.t); form.t = setTimeout(atualiza, 400); }
+  };
+  $("#cur-copiar").onclick = async e => {
+    const b = e.currentTarget, ok = txt => { b.lastChild.textContent = txt; setTimeout(() => b.lastChild.textContent = "Copiar tudo", 2500); };
+    try { await navigator.clipboard.writeText(pronto.texto); ok("Copiado"); }
+    catch (_) {
+      const ta = $("#cur-previa"); ta.hidden = false; ta.value = pronto.texto; ta.select();
+      try { document.execCommand("copy") ? ok("Copiado") : ok("Selecione e copie"); } catch (__) { ok("Selecione e copie"); }
+    }
+  };
+  $("#cur-baixar")?.addEventListener("click", () => {
+    const u = URL.createObjectURL(new Blob([pronto.texto], {type: "text/markdown;charset=utf-8"}));
+    const a = Object.assign(document.createElement("a"), {href: u, download: `curadoria-${new Date().toISOString().slice(0, 10)}.md`});
+    document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000);
+  });
+  $("#cur-ver").onclick = () => { const p = $("#cur-previa"); p.hidden = !p.hidden; if (!p.hidden) p.value = pronto.texto; };
+  atualiza();
+}
+
 // ---------- eventos globais ----------
 document.addEventListener("click", e => {
   const a = e.target.closest("a[data-f]");
@@ -1232,6 +1410,10 @@ document.addEventListener("click", e => {
     for (const t of (a.dataset.tm || "").split(" ").filter(Boolean)) cliquesTema[t] = (cliquesTema[t] || 0) + 1;
     guarda("cliquesTema", cliquesTema);
     enviarAlertas();
+    if (cfg.leitor && e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && a.target === "_blank") {
+      e.preventDefault();
+      abrirLeitor(a.href, a.textContent, D.fontes[a.dataset.f]);
+    }
   }
   const r = e.target.closest(".abre-relac");
   if (r) {
