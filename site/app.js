@@ -958,7 +958,8 @@ function vHistoria(id) {
 
 // busca
 function vBusca() {
-  const f = novoFiltro({ordem: "rel", q: le("ultimaBusca", "")});
+  const digitando = $("#q"), focado = document.activeElement === digitando;  // a tela se redesenha quando as notícias chegam
+  const f = novoFiltro({ordem: "rel", q: digitando ? digitando.value : le("ultimaBusca", "")});
   $("#vista").innerHTML = `<label class="campo-busca">${ic("busca")}<input type="search" id="q" placeholder="Buscar em todas as notícias" aria-label="Buscar (use aspas para frase exata)" autocomplete="off" enterkeyhint="search" value="${esc(f.q)}"><button class="btn-i" id="limpaq" aria-label="Limpar busca">${ic("fechar")}</button></label><div id="corpo"></div>`;
   const q = $("#q");
   let espera;
@@ -966,7 +967,7 @@ function vBusca() {
   q.oninput = () => { clearTimeout(espera); espera = setTimeout(roda, 140); };
   q.onkeydown = e => { if (e.key === "Enter") q.blur(); };  // sem chaves, o "false" das outras teclas cancelava a digitação
   $("#limpaq").onclick = () => { q.value = ""; roda(); q.focus(); };
-  roda(); if (!f.q) q.focus();
+  roda(); if (!f.q || focado) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
 }
 
 // ---------- coleções ----------
