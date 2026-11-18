@@ -1,4 +1,7 @@
-site/*.json
+site/recentes.json
+site/antigas.json
+site/alertas.json
+site/locais.json
 __pycache__/
 android/out/
 android/*.idsig

@@ -2,246 +2,60 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#17150f">
-<title>Radar</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#081211">
+<title>Radar Notícias</title>
 <link rel="icon" href="icone.svg">
-<style>
-:root{--bg:#f6f4ef;--card:#fff;--tx:#1d1b16;--mut:#5f5b51;--bd:#ddd8ca;--ac:#a4471f;--chip:#efe9da;
-  --radical:#b3121d;--moderada:#a1185a;--burguesa:#4a5565;--direita:#1d4ed8;--fs:17px}
-@media (prefers-color-scheme:dark){:root{--bg:#17150f;--card:#211e16;--tx:#f0ecdf;--mut:#b0aa97;--bd:#3a3524;--ac:#e58a5b;--chip:#2e2a1c;
-  --radical:#ff8a8a;--moderada:#f7a1cb;--burguesa:#c3cad5;--direita:#9cbcff}}
-*{box-sizing:border-box}
-html{font-size:var(--fs)}
-body{margin:0;background:var(--bg);color:var(--tx);font:1rem/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
-button,input,select{font:inherit;color:inherit}
-:focus-visible{outline:3px solid var(--ac);outline-offset:2px}
-.topo{position:sticky;top:0;z-index:3;background:var(--bg);border-bottom:1px solid var(--bd)}
-.topo .in,main{max-width:760px;margin:0 auto;padding:0 16px}
-.linha1{display:flex;align-items:center;gap:10px;padding:10px 0 8px}
-.marca{display:flex;align-items:center;gap:8px;margin-right:auto;font-weight:800;font-size:1.25rem;letter-spacing:-.01em}
-.marca svg{width:30px;height:30px;flex-shrink:0}
-.ico{width:44px;height:44px;border:1px solid var(--bd);border-radius:12px;background:var(--card);display:grid;place-items:center;cursor:pointer;padding:0;font-weight:700}
-.ico svg{width:22px;height:22px}
-.ico:disabled{opacity:.5;cursor:wait}
-.busca{position:relative;padding-bottom:10px}
-.busca input{width:100%;height:48px;padding:0 48px 0 44px;border:2px solid var(--bd);border-radius:14px;background:var(--card);font-size:1rem}
-.busca input:focus{border-color:var(--ac);outline:none}
-.busca .lupa{position:absolute;left:14px;top:14px;width:20px;height:20px;color:var(--mut);pointer-events:none}
-.busca .limpar{position:absolute;right:2px;top:2px;width:44px;height:44px;border:0;background:none;font-size:1.4rem;color:var(--mut);cursor:pointer}
-.busca input:placeholder-shown ~ .limpar{display:none}
-.busca input::-webkit-search-cancel-button{display:none}
-.chips{display:flex;gap:8px;overflow-x:auto;padding:12px 0 4px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
-.chips::-webkit-scrollbar{display:none}
-.chips button{flex-shrink:0;min-height:44px;padding:0 16px;border:1px solid var(--bd);border-radius:99px;background:var(--card);cursor:pointer;font-weight:600;display:flex;align-items:center;gap:8px;white-space:nowrap}
-.chips button[aria-pressed=true]{background:var(--tx);color:var(--bg);border-color:var(--tx)}
-.chips .pt{width:10px;height:10px;border-radius:50%;background:var(--c)}
-.chips.periodo button{font-weight:500;min-height:40px;padding:0 14px}
-.status{display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:var(--mut);font-size:.9rem;margin:10px 0 8px;min-height:24px}
-.filtro-fonte{display:inline-flex;align-items:center;gap:4px;background:var(--chip);border:0;border-radius:99px;padding:4px 6px 4px 12px;color:var(--tx);font-weight:600;cursor:pointer;min-height:36px}
-.filtro-fonte span{font-size:1.2rem;line-height:1;padding:0 4px}
-ol{list-style:none;margin:0;padding:0}
-.n{background:var(--card);border:1px solid var(--bd);border-left:5px solid var(--c);border-radius:12px;padding:12px 14px;margin-bottom:10px}
-.n h2{font-size:1.06rem;line-height:1.35;margin:6px 0 0;font-weight:700}
-.n h2 a{color:inherit;text-decoration:none}
-.n h2 a:hover{text-decoration:underline}
-.n h2 a:visited{color:var(--mut)}
-.n p{margin:6px 0 0;color:var(--mut);font-size:.92rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.meta{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;font-size:.84rem;color:var(--mut)}
-.ala{color:var(--c);font-weight:700;text-transform:uppercase;font-size:.74rem;letter-spacing:.04em}
-.fonte{background:none;border:0;padding:6px 0;margin:-6px 0;color:var(--tx);font-weight:600;cursor:pointer;text-decoration:underline;text-decoration-color:var(--bd);text-underline-offset:3px}
-.nova{background:#2f7d4f;color:#fff;border-radius:6px;padding:1px 6px;font-size:.72rem;font-weight:700}
-.r-radical{--c:var(--radical)}.r-moderada{--c:var(--moderada)}.r-burguesa{--c:var(--burguesa)}.r-direita{--c:var(--direita)}
-.vazio,.aviso{text-align:center;color:var(--mut);padding:32px 8px}
-#mais{height:1px}
-details.fontes{margin:24px 0 8px;background:var(--card);border:1px solid var(--bd);border-radius:12px}
-details.fontes summary{padding:0 14px;min-height:48px;display:flex;align-items:center;cursor:pointer;font-weight:700}
-.fl{padding:0 14px 12px}
-.fl h3{font-size:.95rem;margin:14px 0 6px}
-.fl button{display:flex;width:100%;justify-content:space-between;gap:8px;text-align:left;background:none;border:0;border-top:1px solid var(--bd);padding:10px 0;cursor:pointer;min-height:44px}
-.fl small{color:var(--mut)}
-.fl .mal{color:var(--ac)}
-footer{color:var(--mut);font-size:.82rem;padding:8px 0 40px;line-height:1.5}
-footer a{color:inherit}
-@media (prefers-reduced-motion:no-preference){.girando svg{animation:g 1s linear infinite}@keyframes g{to{transform:rotate(360deg)}}}
-</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,400..800&family=Newsreader:opsz,wght@6..72,400..650&display=swap">
+<link rel="stylesheet" href="app.css?v=2">
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+ <symbol id="i-inicio" viewBox="0 0 24 24"><path d="M3.5 10.2 12 3.5l8.5 6.7V19a1.5 1.5 0 0 1-1.5 1.5h-4.5v-6h-5v6H5A1.5 1.5 0 0 1 3.5 19z"/></symbol>
+ <symbol id="i-colecoes" viewBox="0 0 24 24"><path d="M12 3.5 3 8l9 4.5L21 8z"/><path d="m3 12.5 9 4.5 9-4.5M3 16.5l9 4.5 9-4.5"/></symbol>
+ <symbol id="i-banca" viewBox="0 0 24 24"><path d="M4 4.5h12.5V18a2.5 2.5 0 0 0 2.5 2.5H6.5A2.5 2.5 0 0 1 4 18z"/><path d="M16.5 8.5H20V18a2.5 2.5 0 0 1-2.5 2.5M7.5 8.5h5.5M7.5 12h5.5M7.5 15.5h3.5"/></symbol>
+ <symbol id="i-sino" viewBox="0 0 24 24"><path d="M6 9a6 6 0 1 1 12 0c0 6.5 2.5 8.5 2.5 8.5h-17S6 15.5 6 9M10 20.5a2.2 2.2 0 0 0 4 0"/></symbol>
+ <symbol id="i-busca" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></symbol>
+ <symbol id="i-atualizar" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.4-5.7M20 4v4.5h-4.5"/></symbol>
+ <symbol id="i-filtro" viewBox="0 0 24 24"><path d="M4 7h16M7 12h10M10 17h4"/></symbol>
+ <symbol id="i-voltar" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+ <symbol id="i-seta" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+ <symbol id="i-estrela" viewBox="0 0 24 24"><path d="m12 3.5 2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8L3.5 9.7l5.9-.8z"/></symbol>
+ <symbol id="i-mais" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+ <symbol id="i-fechar" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+ <symbol id="i-editar" viewBox="0 0 24 24"><path d="M4 20h4L19.5 8.5l-4-4L4 16z"/></symbol>
+ <symbol id="i-externo" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></symbol>
+ <symbol id="i-sol" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/></symbol>
+ <symbol id="i-nuvem" viewBox="0 0 24 24"><path d="M7 18.5a4.5 4.5 0 0 1-.6-9 6 6 0 0 1 11.5 1.6A3.8 3.8 0 0 1 17.5 18.5z"/></symbol>
+ <symbol id="i-chuva" viewBox="0 0 24 24"><path d="M7 15.5a4.5 4.5 0 0 1-.6-9 6 6 0 0 1 11.5 1.6 3.8 3.8 0 0 1-.4 7.4z"/><path d="m8 18.5-1 2M12 18.5l-1 2M16 18.5l-1 2"/></symbol>
+ <symbol id="i-raio" viewBox="0 0 24 24"><path d="M7 15.5a4.5 4.5 0 0 1-.6-9 6 6 0 0 1 11.5 1.6 3.8 3.8 0 0 1-.4 7.4z"/><path d="m12.5 13-2 4h3l-2 4"/></symbol>
+ <symbol id="logo" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#06110f"/><circle cx="32" cy="32" r="22" fill="#0b2a28" stroke="#2fe3df" stroke-width="2.5"/><circle cx="32" cy="32" r="14" fill="none" stroke="#2fe3df" stroke-width="2"/><circle cx="32" cy="32" r="6" fill="none" stroke="#2fe3df" stroke-width="2"/><path d="M32 10v44M10 32h44" stroke="#2fe3df" stroke-width="1.6"/><path d="M32 32 51 21A22 22 0 0 0 43 13Z" fill="#2fe3df" opacity=".55"/><circle cx="40" cy="17" r="2.6" fill="#effffe"/><circle cx="21" cy="22" r="2.2" fill="#effffe"/></symbol>
+</svg>
+
 <header class="topo">
- <div class="in">
-  <div class="linha1">
-   <div class="marca"><svg viewBox="0 0 192 192" aria-hidden="true"><rect width="192" height="192" rx="40" fill="#17150f"/><path d="M38.7 79.9A70 70 0 0 1 153.3 79.9M58.3 93.6A46 46 0 0 1 133.7 93.6" fill="none" stroke="#e8553f" stroke-width="10" stroke-linecap="round"/><circle cx="96" cy="120" r="14" fill="#e8553f"/></svg>Radar</div>
-   <button class="ico" id="letra" aria-label="Mudar tamanho da letra" title="Tamanho da letra">Aa</button>
-   <button class="ico" id="atualizar" aria-label="Atualizar notícias" title="Atualizar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/></svg></button>
-  </div>
-  <div class="busca">
-   <svg class="lupa" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><circle cx="10.5" cy="10.5" r="7"/><path d="M16 16l5 5"/></svg>
-   <input id="q" type="search" placeholder="Buscar notícias" aria-label="Buscar notícias (use aspas para frase exata)" autocomplete="off" enterkeyhint="search">
-   <button class="limpar" id="limpar" aria-label="Limpar busca">×</button>
-  </div>
+ <div class="topo-in">
+  <a class="marca" href="#inicio" aria-label="Radar Notícias, início"><svg aria-hidden="true"><use href="#logo"/></svg><span><b>RADAR</b><small>NOTÍCIAS</small></span></a>
+  <nav class="abas-topo" aria-label="Seções">
+   <a href="#inicio" data-v="inicio">Início</a><a href="#colecoes" data-v="colecoes">Coleções</a><a href="#banca" data-v="banca">Banca</a><a href="#alertas" data-v="alertas">Alertas e ajustes</a>
+  </nav>
+  <a class="btn-i" href="#busca" aria-label="Buscar"><svg class="i"><use href="#i-busca"/></svg></a>
+  <button class="btn-i" id="atualizar" aria-label="Atualizar notícias"><svg class="i"><use href="#i-atualizar"/></svg></button>
  </div>
 </header>
-<main>
- <nav class="chips" id="alas" aria-label="Linha editorial"></nav>
- <nav class="chips periodo" id="periodo" aria-label="Período"></nav>
- <div class="status" aria-live="polite"><span id="contagem">Carregando…</span><span id="filtroFonte"></span></div>
- <ol id="lista"></ol>
- <div id="mais"></div>
- <details class="fontes" id="fontes"><summary>Fontes</summary><div class="fl" id="fl"></div></details>
- <footer>Toque no nome de um veículo para ver só ele. A busca ignora acentos; use "aspas" para frase exata.<br>
- Títulos e resumos vêm dos feeds públicos de cada site; o texto completo abre no site original.<br><span id="gerado"></span></footer>
-</main>
-<script>
-"use strict";
-const ALAS = [["radical", "Esq. radical"], ["moderada", "Esq. moderada"], ["burguesa", "Imprensa burguesa"], ["direita", "Direita"]];
-const NOME_ALA = Object.fromEntries(ALAS);
-const PERIODOS = [[0, "Tudo"], [24, "24 h"], [72, "3 dias"], [168, "7 dias"]];
-const LOTE = 40;
-const $ = id => document.getElementById(id);
-const guarda = (k, v) => { try { localStorage.setItem("radar." + k, JSON.stringify(v)); } catch (e) {} };
-const le = (k, pad) => { try { const v = localStorage.getItem("radar." + k); return v === null ? pad : JSON.parse(v); } catch (e) { return pad; } };
-const norm = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-const esc = s => s.replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"})[c]);
 
-let itens = [], fontes = {}, gerado = 0, temAntigas = false, carregandoAntigas = null;
-let alas = new Set(le("alas", [])), periodo = le("periodo", 0), fonteSel = null, resultado = [], mostrados = 0;
-const ultimaVisita = le("visita", 0);
-guarda("visita", Math.floor(Date.now() / 1000));
-const tamanhos = ["17px", "19px", "21px", "15px"];
-let tam = le("tam", 0);
-document.documentElement.style.setProperty("--fs", tamanhos[tam] || "17px");
+<main id="vista" tabindex="-1"></main>
 
-function juntar(d) {
-  // as fontes vêm completas nos dois arquivos; índice numérico -> objeto
-  const lista = d.fontes;
-  for (const f of lista) fontes[f.id] = f;
-  const novos = d.itens.map(([t, u, ts, fi, r]) => {
-    const f = lista[fi];
-    return {t, u, ts, r, f, k: norm(t + " " + r + " " + f.nome)};
-  });
-  const vistos = new Set(itens.map(i => i.u));
-  itens = itens.concat(novos.filter(i => !vistos.has(i.u))).sort((a, b) => b.ts - a.ts);
-}
+<nav class="nav" aria-label="Seções">
+ <a href="#inicio" data-v="inicio"><span class="pilula"><svg class="i"><use href="#i-inicio"/></svg></span>Início</a>
+ <a href="#colecoes" data-v="colecoes"><span class="pilula"><svg class="i"><use href="#i-colecoes"/></svg></span>Coleções</a>
+ <a href="#banca" data-v="banca"><span class="pilula"><svg class="i"><use href="#i-banca"/></svg></span>Banca</a>
+ <a href="#alertas" data-v="alertas"><span class="pilula"><svg class="i"><use href="#i-sino"/></svg></span>Alertas</a>
+</nav>
 
-async function baixar(nome) {
-  const r = await fetch(nome, {cache: "no-cache"});  // revalida (ETag): se nada mudou, não baixa de novo
-  if (!r.ok) throw new Error(r.status);
-  return r.json();
-}
-
-async function carregar() {
-  const b = $("atualizar");
-  b.disabled = true; b.classList.add("girando");
-  try {
-    const d = await baixar("recentes.json");
-    itens = []; fontes = {}; gerado = d.gerado;
-    juntar(d);
-    temAntigas = false; carregandoAntigas = null;
-    filtrar();
-    montarFontes();
-    if (precisaAntigas()) antigas();
-  } catch (e) {
-    if (!itens.length) $("contagem").textContent = "Sem conexão. Toque em ↻ para tentar de novo.";
-  } finally { b.disabled = false; b.classList.remove("girando"); }
-}
-
-// o arquivo das notícias com mais de 3 dias só é baixado quando faz falta (economiza dados no celular)
-const precisaAntigas = () => !temAntigas && (periodo === 0 || periodo > 72) && ($("q").value.trim() || fonteSel || periodo > 72);
-function antigas() {
-  if (temAntigas) return Promise.resolve();
-  return carregandoAntigas = carregandoAntigas || baixar("antigas.json").then(d => { juntar(d); temAntigas = true; filtrar(true); }).catch(() => { carregandoAntigas = null; });
-}
-
-function termos(q) {
-  const ts = [];
-  q = norm(q).replace(/"([^"]+)"/g, (_, f) => { ts.push(f.trim()); return " "; });
-  return ts.concat(q.split(/\s+/).filter(Boolean));
-}
-
-function filtrar(manterRolagem) {
-  const q = termos($("q").value);
-  const limite = periodo ? Date.now() / 1000 - periodo * 3600 : 0;
-  resultado = itens.filter(i => i.ts >= limite && (!alas.size || alas.has(i.f.ala)) && (!fonteSel || i.f.id === fonteSel) && q.every(t => i.k.includes(t)));
-  mostrados = 0;
-  $("lista").textContent = "";
-  mostrarMais();
-  const n = resultado.length.toLocaleString("pt-BR");
-  $("contagem").textContent = itens.length ? `${n} ${resultado.length === 1 ? "notícia" : "notícias"}` + (!temAntigas && carregandoAntigas ? " · buscando nas antigas…" : "") : "Carregando…";
-  $("filtroFonte").innerHTML = fonteSel ? `<button class="filtro-fonte" aria-label="Tirar filtro: ${esc(fontes[fonteSel].nome)}">${esc(fontes[fonteSel].nome)}<span aria-hidden="true">×</span></button>` : "";
-  if (itens.length && !resultado.length) $("lista").innerHTML = `<li class="vazio">Nada encontrado${q.length ? " para essa busca" : ""}. Tente outro período ou outra linha.</li>`;
-  $("gerado").textContent = gerado ? "Coleta: " + new Date(gerado * 1000).toLocaleString("pt-BR", {dateStyle: "short", timeStyle: "short"}) : "";
-  if (!manterRolagem && window.scrollY > 300) window.scrollTo(0, 0);
-}
-
-function quando(ts) {
-  const s = Date.now() / 1000 - ts, d = new Date(ts * 1000);
-  if (s < 3570) return `há ${Math.max(1, Math.round(s / 60))} min`;
-  if (s < 86400) return `há ${Math.round(s / 3600)} h`;
-  const ontem = new Date(); ontem.setDate(ontem.getDate() - 1);
-  const hora = d.toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"});
-  if (d.toDateString() === ontem.toDateString()) return "ontem " + hora;
-  return d.toLocaleDateString("pt-BR", {day: "numeric", month: "short"});
-}
-
-function mostrarMais() {
-  const fatia = resultado.slice(mostrados, mostrados + LOTE);
-  mostrados += fatia.length;
-  $("lista").insertAdjacentHTML("beforeend", fatia.map(i => `<li class="n r-${i.f.ala}"><div class="meta"><span class="ala">${NOME_ALA[i.f.ala]}</span><button class="fonte" data-f="${i.f.id}">${esc(i.f.nome)}</button><span>· ${quando(i.ts)}</span>${i.ts > ultimaVisita && ultimaVisita ? '<span class="nova">nova</span>' : ""}</div><h2><a href="${esc(i.u)}" target="_blank" rel="noopener">${esc(i.t)}</a></h2>${i.r ? `<p>${esc(i.r)}</p>` : ""}</li>`).join(""));
-  if (mostrados >= resultado.length && !temAntigas && (periodo === 0 || periodo > 72) && itens.length) antigas();  // chegou ao fim: traz as antigas
-}
-
-function montarChips() {
-  $("alas").innerHTML = `<button data-a="" aria-pressed="${!alas.size}">Todas</button>` + ALAS.map(([a, n]) => `<button data-a="${a}" class="r-${a}" aria-pressed="${alas.has(a)}"><span class="pt"></span>${n}</button>`).join("");
-  $("periodo").innerHTML = PERIODOS.map(([h, n]) => `<button data-p="${h}" aria-pressed="${h === periodo}">${n}</button>`).join("");
-}
-
-function montarFontes() {
-  const lista = Object.values(fontes);
-  $("fontes").firstChild.textContent = `Fontes (${lista.length})`;
-  const agora = Date.now() / 1000;
-  $("fl").innerHTML = ALAS.map(([a, n]) => `<h3>${n}</h3>` + lista.filter(f => f.ala === a).map(f => {
-    const mal = !f.ok || agora - f.ok > 86400;
-    return `<button data-f="${f.id}"><span>${esc(f.nome)} <small>${esc(f.site)}</small></span><small class="${mal ? "mal" : ""}">${mal ? (f.ok ? "falhando desde " + quando(f.ok) : "sem acesso") : "ok"}</small></button>`;
-  }).join("")).join("");
-}
-
-function escolherFonte(id) {
-  fonteSel = id === fonteSel ? null : id;
-  if (fonteSel) { alas.clear(); guarda("alas", []); montarChips(); }
-  if (precisaAntigas()) antigas();
-  filtrar();
-}
-
-$("alas").onclick = e => {
-  const b = e.target.closest("button"); if (!b) return;
-  const a = b.dataset.a;
-  if (!a) alas.clear(); else if (alas.has(a)) alas.delete(a); else alas.add(a);
-  if (alas.size === ALAS.length) alas.clear();
-  guarda("alas", [...alas]); montarChips(); filtrar();
-};
-$("periodo").onclick = e => {
-  const b = e.target.closest("button"); if (!b) return;
-  periodo = +b.dataset.p; guarda("periodo", periodo); montarChips();
-  if (precisaAntigas()) antigas();
-  filtrar();
-};
-$("lista").onclick = e => { const b = e.target.closest(".fonte"); if (b) escolherFonte(b.dataset.f); };
-$("fl").onclick = e => { const b = e.target.closest("button"); if (b) { $("fontes").open = false; escolherFonte(b.dataset.f); } };
-$("filtroFonte").onclick = () => escolherFonte(fonteSel);
-let espera;
-$("q").oninput = () => { clearTimeout(espera); espera = setTimeout(() => { if (precisaAntigas()) antigas(); filtrar(); }, 120); };
-$("q").onkeydown = e => { if (e.key === "Enter") e.target.blur(); };
-$("limpar").onclick = () => { $("q").value = ""; filtrar(); $("q").focus(); };
-$("atualizar").onclick = carregar;
-$("letra").onclick = () => { tam = (tam + 1) % tamanhos.length; guarda("tam", tam); document.documentElement.style.setProperty("--fs", tamanhos[tam]); };
-new IntersectionObserver(es => { if (es[0].isIntersecting && mostrados < resultado.length) mostrarMais(); }, {rootMargin: "800px"}).observe($("mais"));
-let saiu = Date.now();
-document.addEventListener("visibilitychange", () => {
-  if (document.hidden) saiu = Date.now(); else if (Date.now() - saiu > 15 * 60 * 1000) carregar();
-});
-
-montarChips();
-carregar();
-</script>
+<div class="novidade" id="novidade" hidden><button>Novas notícias · toque para ver</button></div>
+<dialog class="folha" id="folha"></dialog>
+<script src="app.js?v=2"></script>
 </body>
 </html>

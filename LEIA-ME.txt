@@ -1,31 +1,45 @@
-RADAR - notícias de todo o espectro
-Junta o Radar do Vale (marca e esquema de coleta) com a lista de imprensa da Biblioteca Marxista.
-4 linhas: esquerda radical, esquerda moderada/liberal, imprensa burguesa e direita.
+RADAR NOTÍCIAS
+Notícias de 76 jornais em 4 linhas editoriais: esquerda radical, esquerda moderada/liberal,
+imprensa burguesa e direita. Site: https://lazanha000.github.io/radar-noticias/
 
 ABRIR
-- Celular: instale android\radar.apk (permitir "fontes desconhecidas").
-- PC: atalho "Radar" (abre https://lazanha000.github.io/radar-noticias/).
+- Celular: instale Sistema Digital\Aplicativos\Android\Radar-Noticias.apk (uma vez).
+  Depois o app se atualiza sozinho: ao abrir, ele vê se há versão nova no site, baixa e o Android
+  pede só um toque para confirmar. O visual e as funções (site) já mudam sem instalar nada.
+- PC: atalho Radar.url
 
-POR QUE É RÁPIDO
-O GitHub coleta todos os feeds de hora em hora e publica 2 arquivos prontos:
-recentes.json (últimas 72 h, ~150 KB comprimido) e antigas.json (até 30 dias / 20 mil notícias),
-que só é baixado quando você busca, filtra por veículo, escolhe 7 dias ou chega ao fim da lista.
-A busca roda na memória do aparelho (cerca de 1 ms), sem consultar site por site.
+ABAS
+- Início: Principais notícias (o mesmo fato em vários jornais), Notícias locais com clima,
+  Para você, Pelo espectro (a mais relevante de cada linha) e Mais recentes. Faixa de seções:
+  Manchetes, Brasil, Mundo e temas. Filtros: período, linha editorial, país citado.
+- Coleções: grupos de jornais que você monta (e as 4 linhas prontas).
+- Banca: cada jornal, com as principais (relevância) ou as mais recentes. Estrela = seguir.
+- Alertas e ajustes: notificações (de quais jornais, quando, temas, silêncio, limite por dia),
+  tema, letra, atualização automática e cidade do clima.
 
-EDITAR FONTES
-- fontes.json: id, nome, ala (radical | moderada | burguesa | direita), site, feed.
-  "tipo": "wp" (API do WordPress), "desc" (manchete na descrição, como o UOL), "ofuturo" (lê a página).
-- Testar sem gravar:  python coletor.py --testar
-- Testes dos leitores: python test_coletor.py
-- Depois de mudar, envie ao GitHub (git push) e a próxima coleta já usa.
-- Para ver no PC antes de publicar: python coletor.py  e  python -m http.server -d site
+RELEVÂNCIA (não há como saber os acessos dos outros sites, então é medida assim)
+- Cobertura: quantos veículos deram o mesmo fato (o coletor junta títulos com palavras raras em comum).
+- Espectro: fato coberto por várias linhas editoriais pesa mais.
+- Frescor: a nota cai pela metade a cada 8 h.
+- Você: jornais e temas que você mais abre e os que segue sobem (fica só no aparelho).
 
-ARQUIVOS
-coletor.py      coleta e grava site\recentes.json e site\antigas.json
-site\           o app (index.html, uma página só)
-android\        APK que abre o site; build.sh monta (bash android/build.sh)
-.github\        coleta automática de hora em hora (GitHub Actions + Pages)
+COLETA (GitHub Actions, de hora em hora; não precisa do PC)
+- coletor.py lê fontes.json e grava em site/: recentes.json (72 h), antigas.json (até 30 dias),
+  alertas.json (6 h, para as notificações) e locais.json (cidades de locais.json, pelo Google Notícias).
+- Temas, Brasil/mundo e países: palavras-chave + endereço da notícia (paises.json). Há erros.
+- Testar:  python test_coletor.py   |   python coletor.py --testar   |   python coletor.py --grupos
+
+EDITAR
+- fontes.json: id, nome, ala (radical|moderada|burguesa|direita), site, feed, e "tipo" quando não é RSS:
+  wp (API do WordPress), desc (manchete na descrição: UOL), news (sitemap de notícias),
+  embutido (RSS dentro de HTML: Correio do Povo), ofuturo (lê a página).
+  Ao incluir fonte, rode python scripts\icones.py para baixar o ícone.
+- locais.json: cidades das Notícias locais (lat/lon = clima).
+- Depois: git push. O site atualiza na próxima coleta.
+- App Android (notificações, atualização): bash android/build.sh e git push.
+  build.sh troca a versão, põe o APK em site/ e em Aplicativos/Android.
 
 LIMITES
-- Só título, resumo e link; a notícia completa abre no site original.
-- Sites que bloqueiam servidores fora do Brasil podem falhar na nuvem: veja "Fontes" no fim do app.
+- Só título, resumo e foto; a notícia abre no site original.
+- Na nuvem, Esquerda Marxista e Le Monde Diplomatique bloqueiam a coleta (403). O Poder Popular está fora do ar.
+- Notícias locais vêm do Google Notícias (uso pessoal, não comercial). Clima: Open-Meteo.

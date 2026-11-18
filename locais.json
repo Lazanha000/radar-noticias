@@ -1,0 +1,9 @@
+[
+{"nome": "Araçuaí", "busca": "\"Araçuaí\"", "lat": -16.85, "lon": -42.07},
+{"nome": "Vale do Jequitinhonha", "busca": "\"Vale do Jequitinhonha\""},
+{"nome": "Belo Horizonte", "busca": "\"Belo Horizonte\"", "lat": -19.92, "lon": -43.94},
+{"nome": "Minas Gerais", "busca": "\"Minas Gerais\" OR \"governo de Minas\""},
+{"nome": "São Paulo", "busca": "\"São Paulo\" cidade OR capital paulista", "lat": -23.55, "lon": -46.63},
+{"nome": "Rio de Janeiro", "busca": "\"Rio de Janeiro\" cidade OR capital fluminense", "lat": -22.91, "lon": -43.17},
+{"nome": "Brasília", "busca": "\"Brasília\" OR \"Distrito Federal\" GDF", "lat": -15.79, "lon": -47.88}
+]

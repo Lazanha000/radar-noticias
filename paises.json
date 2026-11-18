@@ -1,0 +1,466 @@
+[
+{
+"nome": "Rússia",
+"termos": [
+"russia",
+"russ[oa]s?",
+"moscou",
+"kremlin",
+"putin"
+]
+},
+{
+"nome": "Estados Unidos",
+"termos": [
+"estados unidos",
+"eua",
+"estadunidenses?",
+"norte-american[oa]s?",
+"washington",
+"casa branca",
+"trump"
+]
+},
+{
+"nome": "China",
+"termos": [
+"china",
+"chines(a|as|es)?",
+"pequim",
+"xi jinping"
+]
+},
+{
+"nome": "Alemanha",
+"termos": [
+"alemanha",
+"alemao",
+"alema",
+"alemaes",
+"alemas"
+]
+},
+{
+"nome": "França",
+"termos": [
+"franca",
+"frances(a|as|es)?",
+"macron"
+]
+},
+{
+"nome": "Itália",
+"termos": [
+"italia",
+"italian[oa]s?"
+]
+},
+{
+"nome": "Portugal",
+"termos": [
+"portugal",
+"portugues(a|as|es)?"
+]
+},
+{
+"nome": "Espanha",
+"termos": [
+"espanha",
+"madri",
+"sanchez"
+]
+},
+{
+"nome": "Reino Unido",
+"termos": [
+"reino unido",
+"inglaterra",
+"britanic[oa]s?",
+"londres",
+"starmer"
+]
+},
+{
+"nome": "Irlanda",
+"termos": [
+"irlanda",
+"irlandes(a|as|es)?"
+]
+},
+{
+"nome": "Grécia",
+"termos": [
+"grecia",
+"greg[oa]s?"
+]
+},
+{
+"nome": "Polônia",
+"termos": [
+"polonia",
+"polones(a|as|es)?"
+]
+},
+{
+"nome": "Hungria",
+"termos": [
+"hungria",
+"hungar[oa]s?"
+]
+},
+{
+"nome": "Ucrânia",
+"termos": [
+"ucrania",
+"ucranian[oa]s?",
+"kiev",
+"zelensky"
+]
+},
+{
+"nome": "Sérvia",
+"termos": [
+"iugoslavia",
+"iugoslav[oa]s?",
+"servi[oa]s"
+]
+},
+{
+"nome": "Albânia",
+"termos": [
+"albania",
+"albanes(a|as|es)?"
+]
+},
+{
+"nome": "Cuba",
+"termos": [
+"cuba",
+"cuban[oa]s?",
+"havana"
+]
+},
+{
+"nome": "Venezuela",
+"termos": [
+"venezuela",
+"venezuelan[oa]s?",
+"caracas",
+"nicolas maduro",
+"chavez",
+"chavis\\w*"
+]
+},
+{
+"nome": "Argentina",
+"termos": [
+"argentina",
+"argentin[oa]s",
+"buenos aires",
+"milei",
+"peronis\\w*"
+]
+},
+{
+"nome": "Chile",
+"termos": [
+"chile",
+"chilen[oa]s?",
+"allende",
+"pinochet"
+]
+},
+{
+"nome": "Bolívia",
+"termos": [
+"bolivia",
+"bolivian[oa]s?",
+"evo morales"
+]
+},
+{
+"nome": "Peru",
+"termos": [
+"peru",
+"peruan[oa]s?"
+]
+},
+{
+"nome": "Colômbia",
+"termos": [
+"colombia",
+"colombian[oa]s?",
+"petro"
+]
+},
+{
+"nome": "Equador",
+"termos": [
+"equador",
+"equatorian[oa]s?"
+]
+},
+{
+"nome": "México",
+"termos": [
+"mexico",
+"mexican[oa]s?",
+"zapatistas?"
+]
+},
+{
+"nome": "Nicarágua",
+"termos": [
+"nicaragua",
+"nicaraguenses?",
+"sandinistas?"
+]
+},
+{
+"nome": "El Salvador",
+"termos": [
+"el salvador",
+"salvadorenh[oa]s?",
+"bukele"
+]
+},
+{
+"nome": "Haiti",
+"termos": [
+"haiti",
+"haitian[oa]s?"
+]
+},
+{
+"nome": "Uruguai",
+"termos": [
+"uruguai",
+"uruguai[oa]s?"
+]
+},
+{
+"nome": "Paraguai",
+"termos": [
+"paraguai",
+"paraguai[oa]s?"
+]
+},
+{
+"nome": "Palestina",
+"termos": [
+"palestina",
+"palestin[oa]s",
+"gaza",
+"cisjordania"
+]
+},
+{
+"nome": "Israel",
+"termos": [
+"israel",
+"israelenses?",
+"netanyahu",
+"tel aviv"
+]
+},
+{
+"nome": "Líbano",
+"termos": [
+"libano",
+"libanes(a|as|es)?",
+"hezbollah"
+]
+},
+{
+"nome": "Síria",
+"termos": [
+"siria",
+"siri[oa]s"
+]
+},
+{
+"nome": "Irã",
+"termos": [
+"irã",
+"iran\\w*",
+"teera",
+"republica islamica"
+]
+},
+{
+"nome": "Iraque",
+"termos": [
+"iraque",
+"iraquian[oa]s?"
+]
+},
+{
+"nome": "Iêmen",
+"termos": [
+"iemen",
+"iemenitas?",
+"houthis?"
+]
+},
+{
+"nome": "Turquia",
+"termos": [
+"turquia",
+"turc[oa]s?",
+"erdogan"
+]
+},
+{
+"nome": "Egito",
+"termos": [
+"egito",
+"egipci[oa]s?"
+]
+},
+{
+"nome": "Índia",
+"termos": [
+"india",
+"indian[oa]s?",
+"modi"
+]
+},
+{
+"nome": "Vietnã",
+"termos": [
+"vietna",
+"vietnamitas?"
+]
+},
+{
+"nome": "Coreia do Norte",
+"termos": [
+"coreia do norte",
+"norte-coreanos?",
+"pyongyang",
+"coreia popular"
+]
+},
+{
+"nome": "Japão",
+"termos": [
+"japao",
+"japones(a|as|es)?"
+]
+},
+{
+"nome": "Angola",
+"termos": [
+"angola",
+"angolan[oa]s?"
+]
+},
+{
+"nome": "Moçambique",
+"termos": [
+"mocambique",
+"mocambican[oa]s?"
+]
+},
+{
+"nome": "Cabo Verde e Guiné-Bissau",
+"termos": [
+"guine-bissau",
+"cabo verde",
+"cabo-verdian[oa]s?"
+]
+},
+{
+"nome": "África do Sul",
+"termos": [
+"africa do sul",
+"sul-african[oa]s?",
+"apartheid"
+]
+},
+{
+"nome": "Burkina Faso",
+"termos": [
+"burkina faso",
+"sankara"
+]
+},
+{
+"nome": "Sudão",
+"termos": [
+"sudao",
+"sudanes(a|as|es)?"
+]
+},
+{
+"nome": "Canadá",
+"termos": [
+"canada",
+"canadenses?"
+]
+},
+{
+"nome": "Coreia do Sul",
+"termos": [
+"coreia do sul",
+"sul-coreanos?",
+"seul"
+]
+},
+{
+"nome": "Austrália",
+"termos": [
+"australia",
+"australian[oa]s?"
+]
+},
+{
+"nome": "Nigéria",
+"termos": [
+"nigeria",
+"nigerian[oa]s?"
+]
+},
+{
+"nome": "Arábia Saudita",
+"termos": [
+"arabia saudita",
+"sauditas?"
+]
+},
+{
+"nome": "Paquistão",
+"termos": [
+"paquistao",
+"paquistanes(a|as|es)?"
+]
+},
+{
+"nome": "Afeganistão",
+"termos": [
+"afeganistao",
+"talibas?",
+"taleban"
+]
+},
+{
+"nome": "Taiwan",
+"termos": [
+"taiwan",
+"taiwanes(a|as|es)?"
+]
+},
+{
+"nome": "Groenlândia",
+"termos": [
+"groenlandia"
+]
+},
+{
+"nome": "Dinamarca",
+"termos": [
+"dinamarca",
+"dinamarques(a|as|es)?"
+]
+}
+]
