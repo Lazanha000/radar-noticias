@@ -1,0 +1,18 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:background="@drawable/w_fundo">
+  <LinearLayout android:layout_width="match_parent" android:layout_height="44dp" android:orientation="horizontal" android:gravity="center_vertical"
+      android:paddingLeft="12dp" android:paddingRight="4dp">
+    <LinearLayout android:id="@+id/cabeca" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+        android:orientation="horizontal" android:gravity="center_vertical">
+      <ImageView android:layout_width="26dp" android:layout_height="26dp" android:src="@mipmap/ic_launcher" android:contentDescription="Abrir o Radar"/>
+      <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:paddingLeft="8dp" android:text="Principais notícias"
+          android:textColor="@color/w_texto" android:textSize="15sp" android:textStyle="bold" android:fontFamily="serif" android:maxLines="1"/>
+    </LinearLayout>
+    <ImageView android:id="@+id/atualizar" android:layout_width="40dp" android:layout_height="40dp" android:padding="9dp"
+        android:src="@drawable/w_atualizar" android:contentDescription="Atualizar"/>
+  </LinearLayout>
+  <ListView android:id="@+id/lista" android:layout_width="match_parent" android:layout_height="match_parent"
+      android:divider="@color/w_linha" android:dividerHeight="1dp" android:paddingLeft="12dp" android:paddingRight="12dp" android:scrollbars="none"/>
+  <TextView android:id="@+id/vazio" android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center"
+      android:text="Carregando notícias…" android:textColor="@color/w_texto2" android:textSize="13sp"/>
+</LinearLayout>

@@ -2,6 +2,8 @@ site/recentes.json
 site/antigas.json
 site/alertas.json
 site/locais.json
+site/videos.json
+site/widget.json
 __pycache__/
 android/out/
 android/*.idsig

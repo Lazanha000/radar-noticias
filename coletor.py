@@ -298,6 +298,87 @@ def agrupar(itens, agora):
                 m["g"] = gid
 
 
+def assuntos(itens, agora):
+    """Grava i['a']: fatos diferentes sobre o mesmo assunto (ex.: "Fachin diz que STF julga dosimetria" e
+    "Alcolumbre pede a Moraes julgamento da dosimetria"). O app mostra um assunto por vez, sem repetir."""
+    for i in itens:
+        i["a"] = 0
+    janela = [i for i in itens if i["ts"] >= agora - JANELA_GRUPO_H * 3600]
+    if not janela:
+        return
+    # história = um fato (grupo) ou uma notícia sozinha
+    hist = defaultdict(list)
+    for i in janela:
+        hist[("g", i["g"]) if i["g"] else ("u", i["u"])].append(i)
+    hist = list(hist.values())
+    fs = [Counter(w for m in h for w in fichas(m["t"])) for h in hist]
+    # núcleo: palavras que aparecem em pelo menos 30% dos títulos da história
+    nucleo = [{w for w, c in f.items() if c >= max(1, math.ceil(0.3 * len(h)))} for f, h in zip(fs, hist)]
+    df = Counter(w for n in nucleo for w in n)
+    n = len(hist)
+    peso = {w: math.log(n / c) for w, c in df.items() if c <= max(6, n * 0.03)}
+    rara = {w for w, c in df.items() if c <= max(3, n * 0.012)}
+    ordem = sorted(range(n), key=lambda k: -len({m["f"] for m in hist[k]}))
+    dono, por_palavra, sementes = {}, defaultdict(list), []
+    for k in ordem:
+        a = nucleo[k]
+        melhor, nota = None, 0.0
+        for t in {t for w in a & rara for t in por_palavra[w]}:
+            b_ = nucleo[sementes[t]]
+            comuns = [w for w in a & b_ if w in peso]
+            if not any(w in rara for w in comuns) or len(comuns) < 2:
+                continue
+            menor = min(sum(peso.get(w, 0) for w in a), sum(peso.get(w, 0) for w in b_)) or 1
+            s_ = sum(peso[w] for w in comuns) / menor
+            if s_ > nota:
+                melhor, nota = t, s_
+        if melhor is None or nota < 0.28:
+            melhor = len(sementes)
+            sementes.append(k)
+            for w in a & rara:
+                por_palavra[w].append(melhor)
+        dono[k] = melhor
+    tamanho = Counter(dono.values())
+    for k, h in enumerate(hist):
+        if tamanho[dono[k]] > 1:
+            for m in h:
+                m["a"] = dono[k] + 1
+
+
+# ---------- vídeos (YouTube, pelo feed público de cada canal) ----------
+
+def coletar_videos(agora):
+    canais = json.loads((AQUI / "canais.json").read_text(encoding="utf-8"))
+
+    def um(c):
+        url = "https://www.youtube.com/feeds/videos.xml?channel_id=" + c["cid"]
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=25) as r:
+                raiz = ET.fromstring(r.read())
+        except Exception as e:
+            return c, [], f"{type(e).__name__}: {e}"[:120]
+        vs = []
+        for el in raiz:
+            if not el.tag.endswith("entry"):
+                continue
+            campos = {x.tag.split("}")[-1]: x for x in el.iter()}
+            vid = (campos.get("videoId").text or "") if "videoId" in campos else ""
+            ts = data_ts(campos["published"].text) if "published" in campos else None
+            views = int(campos["statistics"].get("views", 0)) if "statistics" in campos else 0
+            link = (campos["link"].get("href") or "") if "link" in campos else ""
+            if vid and ts and ts >= agora - 21 * 86400:  # canais pequenos postam pouco
+                vs.append([limpa(campos["title"].text or ""), vid, min(ts, agora), views, int("/shorts/" in link)])
+        return c, vs, None
+
+    with ThreadPoolExecutor(16) as ex:
+        res = list(ex.map(um, canais))
+    lista = [{"id": c["id"], "nome": c["nome"], "ala": c["ala"], "cid": c["cid"], "n": len(vs), "erro": e} for c, vs, e in res]
+    itens = sorted(([t, v, ts, k, vw, sh] for k, (c, vs, e) in enumerate(res) for t, v, ts, vw, sh in vs), key=lambda x: -x[2])
+    (SITE / "videos.json").write_text(json.dumps({"gerado": agora, "canais": lista, "itens": itens}, ensure_ascii=False,
+                                                 separators=(",", ":")), encoding="utf-8")
+    return len(itens), sum(1 for c in lista if c["n"])
+
+
 # ---------- coleta e gravação ----------
 
 def carregar_anterior():
@@ -339,6 +420,7 @@ def coletar():
     for i in itens:
         i["tm"], i["rg"], i["p"] = classificar(i["t"], i["r"], i["u"], i.get("c", ""), por_id[i["f"]])
     agrupar(itens, agora)
+    assuntos(itens, agora)
     return saude, itens, agora
 
 
@@ -348,7 +430,7 @@ def gravar(saude, itens, agora):
     corte = agora - RECENTE_H * 3600
     comum = {"gerado": agora, "fontes": saude, "paises": [p["nome"] for p in PAISES],
              "temas": {k: v[0] for k, v in TEMAS.items()}}
-    linha = lambda i: [i["t"], i["u"], i["ts"], idx[i["f"]], i["r"], " ".join(i["tm"] + [i["rg"]]), i["p"], i["g"], i["im"]]
+    linha = lambda i: [i["t"], i["u"], i["ts"], idx[i["f"]], i["r"], " ".join(i["tm"] + [i["rg"]]), i["p"], i["g"], i["im"], i["a"]]
     for nome, parte in (("recentes.json", [i for i in itens if i["ts"] >= corte]),
                         ("antigas.json", [i for i in itens if i["ts"] < corte])):
         (SITE / nome).write_text(json.dumps(dict(comum, itens=[linha(i) for i in parte]), ensure_ascii=False,
@@ -363,6 +445,21 @@ def gravar(saude, itens, agora):
                 "nf": len(fontes_g[i["g"]]) if i["g"] else 1, "na": len(alas_g[i["g"]]) if i["g"] else 1,
                 "tm": i["tm"] + [i["rg"]]}
                for i in itens if i["ts"] >= agora - ALERTA_H * 3600]
+    def nota(i):
+        cob = 1 + 1.6 * math.log(len(fontes_g[i["g"]])) + 0.35 * (len(alas_g[i["g"]]) - 1) if i["g"] else 1
+        return cob * 0.5 ** (max(0, agora - i["ts"]) / 3600 / 8)
+    vistos, destaque = set(), []
+    for i in sorted((i for i in itens if i["ts"] >= agora - 24 * 3600), key=lambda i: (-nota(i), -bool(i["im"]))):
+        chave = ("a", i["a"]) if i["a"] else ("g", i["g"]) if i["g"] else ("u", i["u"])
+        if chave in vistos:
+            continue
+        vistos.add(chave)
+        destaque.append({"t": i["t"], "u": i["u"], "ts": i["ts"], "f": fonte[i["f"]]["nome"], "ala": fonte[i["f"]]["ala"],
+                         "nf": len(fontes_g[i["g"]]) if i["g"] else 1})
+        if len(destaque) == 25:
+            break
+    (SITE / "widget.json").write_text(json.dumps({"gerado": agora, "itens": destaque}, ensure_ascii=False,
+                                                 separators=(",", ":")), encoding="utf-8")
     (SITE / "alertas.json").write_text(json.dumps({"gerado": agora, "itens": alertas}, ensure_ascii=False,
                                                   separators=(",", ":")), encoding="utf-8")
 
@@ -415,7 +512,20 @@ if __name__ == "__main__":
             print(f"\n== {len({x['f'] for x in membros})} veículos")
             for x in membros[:8]:
                 print(f"   {x['f'][:14]:14} {x['t'][:100]}")
+    if "--assuntos" in sys.argv:
+        a = defaultdict(list)
+        for i in itens:
+            if i["a"]:
+                a[i["a"]].append(i)
+        for membros in sorted(a.values(), key=lambda m: -len(m))[:20]:
+            print(f"\n## assunto com {len(membros)} notícias, {len({x['g'] or x['u'] for x in membros})} fatos")
+            vistos = set()
+            for x in membros:
+                if (x["g"] or x["u"]) not in vistos:
+                    vistos.add(x["g"] or x["u"])
+                    print(f"   {x['t'][:110]}")
     if "--testar" not in sys.argv:
         SITE.mkdir(exist_ok=True)
         gravar(saude, itens, agora)
         print(f"{coletar_locais(agora)} notícias locais")
+        print("%d vídeos de %d canais" % coletar_videos(agora))

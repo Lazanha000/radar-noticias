@@ -28,7 +28,7 @@ for x,y,r in ((c+26*S,c-50*S,8*S),(c-34*S,c-30*S,7*S)): d.ellipse((x-r,y-r,x+r,y
 im.resize((192,192),Image.LANCZOS).save('res/mipmap/ic_launcher.png')"
 
 "$BT/aapt2" compile --dir res -o out/res.zip
-"$BT/aapt2" link -o out/base.apk -I "$JAR" --manifest AndroidManifest.xml out/res.zip --java out/gen --min-sdk-version 24 --target-sdk-version 34
+"$BT/aapt2" link -o out/base.apk -I "$JAR" --manifest AndroidManifest.xml out/res.zip --java out/gen --min-sdk-version 24 --target-sdk-version 34 --auto-add-overlay
 javac -source 8 -target 8 -bootclasspath "$JAR" -nowarn -Xlint:-options -d out/classes src/br/radarnoticias/*.java out/gen/br/radarnoticias/R.java
 "$BT/d8.bat" --release --lib "$JAR" --min-api 24 --output out $(find out/classes -name "*.class")
 "$PY" -c "import zipfile; zipfile.ZipFile('out/base.apk','a').write('out/classes.dex','classes.dex')"

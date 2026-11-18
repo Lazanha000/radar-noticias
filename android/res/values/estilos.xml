@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <style name="Tema" parent="@android:style/Theme.Material.NoActionBar">
+    <item name="android:windowBackground">@color/fundo</item>
+  </style>
+  <color name="fundo">#081211</color>
+  <color name="w_fundo">#F2081211</color>
+  <color name="w_texto">#EBE6D8</color>
+  <color name="w_texto2">#9FB0AC</color>
+  <color name="w_ciano">#2FD9D6</color>
+  <color name="w_linha">#21383A</color>
+</resources>

@@ -40,9 +40,19 @@ public class MainActivity extends Activity {
             }
         });
         setContentView(web);
-        if (salvo == null) web.loadUrl(SITE); else web.restoreState(salvo);
+        String hash = hashDe(getIntent());
+        if (salvo == null) web.loadUrl(SITE + (hash != null ? "#" + hash : "")); else web.restoreState(salvo);
         Vigia.agendar(this);  // reagenda depois de atualizar o app
-        if (salvo == null) new Thread(new Runnable() { public void run() { verificarAtualizacao(); } }).start();
+        if (salvo == null) new Thread(new Runnable() { public void run() {
+            verificarAtualizacao();
+            WidgetPrincipais.baixarEAtualizar(getApplicationContext());
+        } }).start();
+    }
+
+    /** Atalhos do ícone e widgets abrem "radar:busca", "radar:colecao/ID"... */
+    static String hashDe(Intent i) {
+        Uri u = i == null ? null : i.getData();
+        return u != null && "radar".equals(u.getScheme()) ? u.getSchemeSpecificPart() : null;
     }
 
     void abrir(Uri u) {
@@ -84,6 +94,8 @@ public class MainActivity extends Activity {
     @Override
     protected void onNewIntent(Intent i) {
         super.onNewIntent(i);
+        String hash = hashDe(i);
+        if (hash != null) { web.evaluateJavascript("window.radarAbrir && radarAbrir(" + JSONObject.quote(hash) + ")", null); return; }
         if (!INSTALOU.equals(i.getAction())) return;
         int st = i.getIntExtra(PackageInstaller.EXTRA_STATUS, -999);
         if (st == PackageInstaller.STATUS_PENDING_USER_ACTION) {
@@ -113,6 +125,35 @@ public class MainActivity extends Activity {
         }
         @JavascriptInterface public void testar() {
             Vigia.notificar(MainActivity.this, "Radar Notícias · teste", "Assim chega um aviso de notícia relevante. Toque para abrir.", SITE, 1);
+        }
+        /** Lê um site para a página (sites e cidades que você adicionou); responde em radarResposta(id, ok, texto). */
+        @JavascriptInterface public void baixar(final int id, final String url) {
+            new Thread(new Runnable() { public void run() {
+                boolean ok = false; String txt;
+                try {
+                    if (!url.startsWith("https://") && !url.startsWith("http://")) throw new Exception("endereço inválido");
+                    txt = Vigia.baixarTexto(url); ok = true;
+                } catch (Exception e) { txt = String.valueOf(e.getMessage()); }
+                final String js = "window.radarResposta && radarResposta(" + id + "," + ok + "," + JSONObject.quote(txt) + ")";
+                runOnUiThread(new Runnable() { public void run() { web.evaluateJavascript(js, null); } });
+            } }).start();
+        }
+        /** Suas coleções viram atalhos ao segurar o ícone do app (junto de Buscar, Manchetes e Vídeos). */
+        @JavascriptInterface public void atalhos(String json) {
+            if (Build.VERSION.SDK_INT < 25) return;
+            try {
+                org.json.JSONArray a = new org.json.JSONArray(json);
+                java.util.List<android.content.pm.ShortcutInfo> l = new java.util.ArrayList<>();
+                for (int k = 0; k < a.length() && k < 2; k++) {
+                    JSONObject c = a.getJSONObject(k);
+                    l.add(new android.content.pm.ShortcutInfo.Builder(MainActivity.this, "colecao-" + c.getString("id"))
+                        .setShortLabel(c.getString("nome").isEmpty() ? "Coleção" : c.getString("nome"))
+                        .setIcon(android.graphics.drawable.Icon.createWithResource(MainActivity.this, R.drawable.sc_colecao))
+                        .setIntent(new Intent(Intent.ACTION_VIEW, Uri.parse("radar:colecao/" + c.getString("id"))).setClass(MainActivity.this, MainActivity.class))
+                        .setRank(10 + k).build());
+                }
+                getSystemService(android.content.pm.ShortcutManager.class).setDynamicShortcuts(l);
+            } catch (Exception e) { /* atalho é extra: sem ele o app segue normal */ }
         }
         @JavascriptInterface public String versao() {
             try { return getPackageManager().getPackageInfo(getPackageName(), 0).versionName; } catch (Exception e) { return ""; }

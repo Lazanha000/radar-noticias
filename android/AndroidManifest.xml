@@ -1,19 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="br.radarnoticias" android:versionCode="261118091" android:versionName="2.261118091">
+    package="br.radarnoticias" android:versionCode="261118094" android:versionName="2.261118094">
   <uses-permission android:name="android.permission.INTERNET" />
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
   <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
   <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-  <application android:label="Radar Notícias" android:icon="@mipmap/ic_launcher"
-      android:theme="@android:style/Theme.Material.NoActionBar">
-    <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTop"
-        android:configChanges="orientation|screenSize|keyboardHidden">
+  <application android:label="Radar Notícias" android:icon="@mipmap/ic_launcher" android:theme="@style/Tema"
+      android:resizeableActivity="true">
+    <!-- configChanges: em tela dividida, janela flutuante e ao girar, a página não recarrega (antes perdia o lugar) -->
+    <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTop" android:resizeableActivity="true"
+        android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation|uiMode|density|fontScale">
       <intent-filter>
         <action android:name="android.intent.action.MAIN" />
         <category android:name="android.intent.category.LAUNCHER" />
       </intent-filter>
+      <meta-data android:name="android.app.shortcuts" android:resource="@xml/atalhos" />
     </activity>
     <service android:name=".Vigia" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="false" />
+    <receiver android:name=".WidgetPrincipais" android:exported="false" android:label="Radar: principais notícias">
+      <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_principais" />
+    </receiver>
+    <receiver android:name=".WidgetBusca" android:exported="false" android:label="Radar: busca">
+      <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_busca" />
+    </receiver>
+    <service android:name=".WidgetServico" android:permission="android.permission.BIND_REMOTEVIEWS" android:exported="false" />
   </application>
 </manifest>

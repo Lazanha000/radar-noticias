@@ -1,0 +1,12 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/raiz"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="horizontal"
+    android:gravity="center_vertical" android:background="@drawable/w_fundo" android:paddingLeft="10dp" android:paddingRight="12dp">
+  <ImageView android:layout_width="36dp" android:layout_height="36dp" android:src="@mipmap/ic_launcher" android:contentDescription="Radar"/>
+  <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:paddingLeft="10dp">
+    <TextView android:id="@+id/fonte" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:textColor="@color/w_ciano" android:textSize="11sp" android:textStyle="bold" android:maxLines="1" android:ellipsize="end"/>
+    <TextView android:id="@+id/titulo" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:textColor="@color/w_texto" android:textSize="14sp" android:maxLines="2" android:ellipsize="end" android:fontFamily="serif"
+        android:text="Carregando notícias…"/>
+  </LinearLayout>
+</LinearLayout>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+  <shortcut android:shortcutId="busca" android:enabled="true" android:icon="@drawable/sc_busca" android:shortcutShortLabel="@string/sc_busca">
+    <intent android:action="android.intent.action.VIEW" android:targetPackage="br.radarnoticias" android:targetClass="br.radarnoticias.MainActivity" android:data="radar:busca" />
+  </shortcut>
+  <shortcut android:shortcutId="manchetes" android:enabled="true" android:icon="@drawable/sc_manchetes" android:shortcutShortLabel="@string/sc_manchetes">
+    <intent android:action="android.intent.action.VIEW" android:targetPackage="br.radarnoticias" android:targetClass="br.radarnoticias.MainActivity" android:data="radar:manchetes" />
+  </shortcut>
+  <shortcut android:shortcutId="videos" android:enabled="true" android:icon="@drawable/sc_videos" android:shortcutShortLabel="@string/sc_videos">
+    <intent android:action="android.intent.action.VIEW" android:targetPackage="br.radarnoticias" android:targetClass="br.radarnoticias.MainActivity" android:data="radar:videos" />
+  </shortcut>
+</shortcuts>

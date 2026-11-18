@@ -54,6 +54,7 @@ public class Vigia extends JobService {
         final JobParameters params = p;
         new Thread(new Runnable() { public void run() {
             try { verificar(Vigia.this); } catch (Exception e) { /* sem internet: tenta na próxima */ }
+            WidgetPrincipais.baixarEAtualizar(Vigia.this);  // aproveita para atualizar os widgets
             jobFinished(params, false);
         } }).start();
         return true;
