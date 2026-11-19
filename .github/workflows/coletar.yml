@@ -2,7 +2,10 @@ name: Coletar e publicar
 
 on:
   schedule:
-    - cron: "23 * * * *"  # de hora em hora
+    # o GitHub descarta/atrasa execuções agendadas em horários cheios; duas entradas por hora dão mais chances
+    # (se uma for pulada, a outra costuma rodar). A "concurrency" abaixo impede coletas simultâneas.
+    - cron: "17 * * * *"
+    - cron: "47 * * * *"
   workflow_dispatch:
   push:
     branches: [main]
