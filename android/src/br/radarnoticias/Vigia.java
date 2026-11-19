@@ -103,8 +103,13 @@ public class Vigia extends JobService {
         Set<String> jaAvisou = lista(avisadas);
         boolean primeiraVez = !sp.contains("avisadas");
 
-        JSONArray itens = new JSONObject(baixarTexto(MainActivity.SITE + "alertas.json?t=" + System.currentTimeMillis())).getJSONArray("itens");
-        long limite = System.currentTimeMillis() / 1000 - 3 * 3600;  // só fatos com notícia nas últimas 3 h
+        JSONObject doc = new JSONObject(baixarTexto(MainActivity.SITE + "alertas.json?t=" + System.currentTimeMillis()));
+        JSONArray itens = doc.getJSONArray("itens");
+        long agoraS = System.currentTimeMillis() / 1000;
+        // "recente" conta a partir de quando o arquivo foi gerado, não de agora: o GitHub atrasa a coleta por horas
+        // e, medindo a partir de agora, nada passava no filtro. Teto de 12 h para não avisar coisa velha demais.
+        long gerado = doc.optLong("gerado", agoraS);
+        long limite = Math.max(Math.min(gerado, agoraS) - 3 * 3600, agoraS - 12 * 3600);
         Map<String, List<JSONObject>> grupos = new LinkedHashMap<>();
         for (int i = 0; i < itens.length(); i++) {
             JSONObject it = itens.getJSONObject(i);
